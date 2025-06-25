@@ -1,0 +1,46 @@
+# climate.yaml
+
+climate:
+
+  #————————————————————————————————————————————————————
+  # 1) Cold‐side heatsink PID loop
+  #————————————————————————————————————————————————————
+  - platform: pid
+    id: pid_cold
+    name: "PID Cold Heatsink Temperature"
+    sensor: cold_temp
+    default_target_temperature: 12.22°C
+    cool_output: tec_output
+    control_parameters:
+      kp: 0.45694
+      ki: 0.00737
+      kd: 7.08259
+
+  #————————————————————————————————————————————————————
+  # 2) Chamber dry‐bulb temperature PID loop
+  #————————————————————————————————————————————————————
+  - platform: pid
+    id: pid_drybulb
+    name: "PID Dry Bulb Temperature"
+    sensor: chamber_temp
+    default_target_temperature: 20°C
+    cool_output: cold_fan_compensated_output
+    heat_output: heater_output
+    control_parameters:
+      kp: 0.80701
+      ki: 0.00215
+      kd: 75.85897
+
+  #————————————————————————————————————————————————————
+  # 3) Chamber dewpoint PID loop
+  #————————————————————————————————————————————————————
+  - platform: pid
+    id: pid_dewpoint
+    name: "PID Dew Point"
+    sensor: dewpoint
+    default_target_temperature: 12.22°C
+    cool_output: dewpoint_pid_output
+    control_parameters:
+      kp: 0.75274
+      ki: 0.00251
+      kd: 56.45589

@@ -1,0 +1,42 @@
+substitutions:
+  device_id:  "phaseshift_${mac_suffix}"
+  device_name: "PhaseShift ${mac_suffix}"
+  use_fahrenheit: "true"   # set to "false" if you want native °C
+  temp_unit: "°F"  # set to "°C" if you want native °C
+  default_max_current: "3.5"
+
+  default_ramp_duration: "8"
+  default_plateau_duration: "4"
+
+  ramp_start_dewpoint: "56.0"
+  ramp_end_dewpoint: "52.0"
+  ramp_start_temp: "68.0"
+  ramp_end_temp: "68.0"
+  ramp_start_fan_speed: "100"
+  ramp_end_fan_speed: "10"
+  ramp_start_fan_modulation: "100"
+  ramp_end_fan_modulation: "10"
+
+packages:
+  hardware:  !include hardware.yaml
+  controls:  !include controls.yaml
+  sensors:   !include sensors.yaml
+  climate:   !include climate.yaml
+  actuators: !include actuators.yaml
+  scripts:   !include scripts.yaml
+  timing:    !include timing.yaml
+
+esphome:
+  name: $device_id
+  friendly_name: $device_name
+  name_add_mac_suffix: true
+
+  on_boot:
+    then:
+      - script.execute: return_to_default
+      - script.execute: ti_driver_startup
+
+esp32:
+  board: mhetesp32minikit
+  framework:
+    type: arduino
