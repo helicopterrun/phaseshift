@@ -1,4 +1,7 @@
 # phaseshift.yaml
+# PhaseShift Open Environmental Control
+# Version: 2025.06.26.1
+# Developer: @helicopterrun
 
 substitutions:
   device_id:  "phaseshift"
