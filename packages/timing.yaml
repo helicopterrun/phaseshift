@@ -22,15 +22,3 @@ interval:
             - lambda: |-
                 id(dewpoint_setpoint).publish_state(id(ramp_dwpt_setpoint_dynamic).state);
             - script.execute: activate_setpoints
-
-time:
-  - platform: sntp
-    id: sntp_time
-    timezone: "America/Los_Angeles"
-    on_time:
-      - seconds: 0
-        minutes: 0
-        hours: 0
-        then:
-          - script.execute: update_elapsed_times
-          - script.execute: update_mode_from_elapsed
