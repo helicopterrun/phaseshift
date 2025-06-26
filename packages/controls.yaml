@@ -1,9 +1,58 @@
 # controls.yaml
 
-#—————————————————————————————————————
-# Duration controls for each phase
-#—————————————————————————————————————
 number:
+  #—————————————————————————————————————
+  # Primary target setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Drybulb Target"
+    id: drybulb_setpoint
+    icon: mdi:thermometer
+    optimistic: true
+    initial_value: ${ramp_start_temp}
+    unit_of_measurement: "${temp_unit}"
+    min_value: -40
+    max_value: 212
+    step: 0.5
+
+  - platform: template
+    name: "Dewpoint Target"
+    id: dewpoint_setpoint
+    icon: mdi:weather-fog
+    optimistic: true
+    initial_value: ${ramp_start_dewpoint}
+    unit_of_measurement: "${temp_unit}"
+    min_value: -40
+    max_value: 212
+    step: 0.5
+
+  #—————————————————————————————————————
+  # Hardware driver numbers (internal)
+  #—————————————————————————————————————
+  - platform: template
+    name: "Max TEC Current"
+    id: pwm_max_current_number
+    internal: true
+    optimistic: true
+    initial_value: ${default_max_current}
+    unit_of_measurement: "A"
+    min_value: 0
+    max_value: ${default_max_current}
+    step: 0.1
+
+  - platform: template
+    name: "Driver Output Level"
+    id: tec_pl_number
+    internal: true
+    optimistic: true
+    initial_value: 0.0
+    min_value: 0.0
+    max_value: 1.0
+    step: 0.01
+
+  #—————————————————————————————————————
+  # Duration controls for each phase
+  #—————————————————————————————————————
   - platform: template
     name: "Ramp Duration"
     id: ramp_duration
@@ -26,50 +75,50 @@ number:
     max_value: 256
     step: 1
 
-#—————————————————————————————————————
-# Ramp-stage dynamic setpoint overrides
-#—————————————————————————————————————
+  #—————————————————————————————————————
+  # Ramp-stage dynamic setpoint overrides
+  #—————————————————————————————————————
   - platform: template
     name: "Ramp Start Dewpoint"
     id: ramp_start_dewpoint
-    unit_of_measurement: ${temp_unit}
+    unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_start_dewpoint}
-    min_value: 0
-    max_value: 100
+    min_value: -40
+    max_value: 212
     step: 0.5
     icon: mdi:weather-fog
 
   - platform: template
     name: "Ramp End Dewpoint"
     id: ramp_end_dewpoint
-    unit_of_measurement: ${temp_unit}
+    unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_end_dewpoint}
-    min_value: 0
-    max_value: 100
+    min_value: -40
+    max_value: 212
     step: 0.5
     icon: mdi:weather-fog
 
   - platform: template
     name: "Ramp Start Temperature"
     id: ramp_start_temp
-    unit_of_measurement: ${temp_unit}
+    unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_start_temp}
-    min_value: 0
-    max_value: 100
+    min_value: -40
+    max_value: 212
     step: 0.5
     icon: mdi:thermometer
 
   - platform: template
     name: "Ramp End Temperature"
     id: ramp_end_temp
-    unit_of_measurement: ${temp_unit}
+    unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_end_temp}
-    min_value: 0
-    max_value: 100
+    min_value: -40
+    max_value: 212
     step: 0.5
     icon: mdi:thermometer
 
@@ -117,6 +166,114 @@ number:
     step: 1
     icon: mdi:timer
 
+  #—————————————————————————————————————
+  # Plateau static setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Plateau Temperature"
+    id: plateau_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    initial_value: ${plateau_temp}
+    min_value: -40
+    max_value: 212
+    step: 0.5
+    icon: mdi:thermometer
+
+  - platform: template
+    name: "Plateau Dewpoint"
+    id: plateau_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    initial_value: ${plateau_dewpoint}
+    min_value: -40
+    max_value: 212
+    step: 0.5
+    icon: mdi:weather-fog
+
+  - platform: template
+    name: "Plateau Circulation Fan Speed"
+    id: circ_speed_plateau
+    unit_of_measurement: "%"
+    optimistic: true
+    initial_value: ${plateau_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+
+  - platform: template
+    name: "Plateau Circulation Duty (sec/min)"
+    id: circ_duty_plateau
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    initial_value: ${plateau_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+
+  #—————————————————————————————————————
+  # Hold static setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Hold Temperature"
+    id: hold_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    initial_value: ${hold_temp}
+    min_value: -40
+    max_value: 212
+    step: 0.5
+    icon: mdi:thermometer
+
+  - platform: template
+    name: "Hold Dewpoint"
+    id: hold_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    initial_value: ${hold_dewpoint}
+    min_value: -40
+    max_value: 212
+    step: 0.5
+    icon: mdi:weather-fog
+
+  - platform: template
+    name: "Hold Circulation Fan Speed"
+    id: circ_speed_hold
+    unit_of_measurement: "%"
+    optimistic: true
+    initial_value: ${hold_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+
+  - platform: template
+    name: "Hold Circulation Duty (sec/min)"
+    id: circ_duty_hold
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    initial_value: ${hold_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+
+  #───────────────────────────────────────────
+  # Cold Heatsink Setpoint (for defrost & PID override)
+  #───────────────────────────────────────────
+  - platform: template
+    name: "Cold Heatsink Setpoint"
+    id: cold_hs_setpoint
+    unit_of_measurement: "°C"
+    optimistic: true
+    initial_value: ${plateau_temp}    # default placeholder; updated by scripts
+    min_value: -15.0
+    max_value: 27.0
+    step: 0.01
+    icon: mdi:coolant-temperature
+
 #—————————————————————————————————————
 # Phase selector
 #—————————————————————————————————————
@@ -138,9 +295,10 @@ select:
         - script.execute: update_circulation_fan
 
 #—————————————————————————————————————
-# Submit button
+# Buttons for setpoint & driver control
 #—————————————————————————————————————
 button:
+  # Push all setpoints (Drybulb & Dewpoint) into the PID controllers
   - platform: template
     name: "Submit Setpoints"
     id: submit_values
@@ -171,3 +329,31 @@ button:
             id: pid_dewpoint
             mode: COOL
             target_temperature: !lambda 'return id(dewpoint_celcius).state;'
+
+  # Apply the maximum current limit to the TEC drivers
+  - platform: template
+    name: "Apply Max Current"
+    id: apply_current_settings
+    icon: mdi:flash
+    on_press:
+      then:
+        - output.set_level:
+            id: vref_a_out
+            level: !lambda 'return id(pwm_max_current_number).state * 0.7467 / 5.0;'
+        - output.set_level:
+            id: vref_b_out
+            level: !lambda 'return id(pwm_max_current_number).state * 0.7467 / 5.0;'
+
+  # Push the driver PWM level out to the TEC channels
+  - platform: template
+    name: "Set PWM"
+    id: set_pwm
+    icon: mdi:emoticon-outline
+    on_press:
+      then:
+        - output.set_level:
+            id: pwm_a
+            level: !lambda 'return id(tec_pl_number).state;'
+        - output.set_level:
+            id: pwm_b
+            level: !lambda 'return id(tec_pl_number).state;'
