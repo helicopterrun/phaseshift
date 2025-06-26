@@ -1,12 +1,15 @@
+# phaseshift.yaml
+
 substitutions:
-  device_id:  "phaseshift_${mac_suffix}"
-  device_name: "PhaseShift ${mac_suffix}"
+  device_id:  "phaseshift"
+  device_name: "PhaseShift"
+  sensor_driver: "tmp117"   # or "dallas"
   use_fahrenheit: "true"   # set to "false" if you want native °C
   temp_unit: "°F"  # set to "°C" if you want native °C
   default_max_current: "3.5"
 
-  default_ramp_duration: "8"
-  default_plateau_duration: "4"
+  ramp_duration: "8"
+  plateau_duration: "4"
 
   ramp_start_dewpoint: "56.0"
   ramp_end_dewpoint: "52.0"
@@ -17,14 +20,65 @@ substitutions:
   ramp_start_fan_modulation: "100"
   ramp_end_fan_modulation: "10"
 
+  plateau_dewpoint: "52.0"
+  plateau_temp: "68.0"
+  plateau_fan_speed: "10"
+  plateau_fan_modulation: "10"
+
+  hold_dewpoint: "54.0"
+  hold_temp: "68.0"
+  hold_fan_speed: "10"
+  hold_fan_modulation: "10"
+
+  # Networking (optional static IP)
+  static_ip: "192.168.50.224"
+  gateway:   "192.168.50.1"
+  subnet:    "255.255.255.0"
+
+  # I²C pins
+  i2c_sda: "21"
+  i2c_scl: "22"
+
+  # I²C device addresses
+  ads1115_address:  "0x49"
+  mcp4728_address:  "0x60"
+
+  # TEC driver control pins
+  nsleep_a_pin:   "26"
+  nsleep_b_pin:   "18"
+  p_mode_pin:     "19"
+
+  # TEC PWM outputs & frequency
+  pwm_tec_a_pin:  "13"
+  pwm_tec_b_pin:  "33"
+  pwm_tec_freq:   "19531Hz"
+
+  # Fan PWM outputs & frequency
+  pwm_fan_hot_pin:  "32"
+  pwm_fan_cold_pin: "25"
+  pwm_fan_circ_pin: "17"
+  pwm_fan_freq:     "25000Hz"
+
+  # Heater relay pin
+  heat_pin:       "12"
+
+  # Heatsink temperature sensor configuration
+  dallas_pin:         "27"
+  cold_temp_address:  "0x4B"                  # for tmp117 or Dallas ROM
+  hot_temp_address:   "0x48"                  # for tmp117 or Dallas ROM
+
+  # SNTP timezone
+  timezone: "America/Los_Angeles"
+
 packages:
-  hardware:  !include hardware.yaml
-  controls:  !include controls.yaml
-  sensors:   !include sensors.yaml
-  climate:   !include climate.yaml
-  actuators: !include actuators.yaml
-  scripts:   !include scripts.yaml
-  timing:    !include timing.yaml
+  hardware:  !include packages/hardware_${sensor_driver}.yaml
+  controls:  !include packages/controls.yaml
+  sensors_common:    !include packages/sensors_common.yaml
+  sensors_driver:    !include packages/sensors_${sensor_driver}.yaml
+  climate:   !include packages/climate.yaml
+  actuators: !include packages/actuators.yaml
+  scripts:   !include packages/scripts.yaml
+  timing:    !include packages/timing.yaml
 
 esphome:
   name: $device_id
@@ -40,3 +94,21 @@ esp32:
   board: mhetesp32minikit
   framework:
     type: arduino
+
+globals:
+  - id: ramp_start_timestamp
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+  - id: plateau_start_timestamp
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+  - id: hold_start_timestamp
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
+  - id: last_mode
+    type: std::string
+    restore_value: true
+    initial_value: '"Hold"'
