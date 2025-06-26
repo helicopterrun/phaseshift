@@ -2,9 +2,7 @@
 
 script:
 
-  #──────────────────────────────────────────────────────────────
-  # Publish the correct setpoints for the current mode
-  #──────────────────────────────────────────────────────────────
+  # Publish the correct setpoints for the current phase
   - id: publish_mode_setpoints
     then:
       - lambda: |-
@@ -15,18 +13,16 @@ script:
             dp = id(ramp_dwpt_setpoint_dynamic).state;
           } else if (m == "Plateau") {
             db = id(plateau_temp).state;
-            dp = id(plateau_dwpt).state;
-          } else {  // Hold
+            dp = id(plateau_dewpoint).state;
+          } else {  # Hold
             db = id(hold_temp).state;
-            dp = id(hold_dwpt).state;
+            dp = id(hold_dewpoint).state;
           }
           id(drybulb_setpoint).publish_state(db);
           id(dewpoint_setpoint).publish_state(dp);
       - script.execute: activate_setpoints
 
-  #──────────────────────────────────────────────────────────────
-  # Automatically change mode based on elapsed days
-  #──────────────────────────────────────────────────────────────
+  # Automatically change phase based on elapsed days
   - id: update_mode_from_elapsed
     mode: restart
     then:
@@ -64,17 +60,13 @@ script:
                       id: mode
                       option: "Hold"
 
-  #──────────────────────────────────────────────────────────────
-  # Update circulation fan whenever called
-  #──────────────────────────────────────────────────────────────
+  # Update the circulation fan output
   - id: update_circulation_fan
     mode: restart
     then:
       - component.update: circ_fan_command
 
-  #──────────────────────────────────────────────────────────────
   # TEC driver initialization on boot
-  #──────────────────────────────────────────────────────────────
   - id: ti_driver_startup
     then:
       - output.turn_off: nsleep_a
@@ -98,9 +90,7 @@ script:
           value: 0.0
       - button.press: set_pwm
 
-  #──────────────────────────────────────────────────────────────
-  # Return to saved defaults on boot
-  #──────────────────────────────────────────────────────────────
+  # Restore last phase and units on boot
   - id: return_to_default
     then:
       - script.execute: restore_mode
@@ -124,23 +114,17 @@ script:
           else:
             - switch.turn_off: use_fahrenheit
 
-  #──────────────────────────────────────────────────────────────
-  # Initialize setpoints based on the last mode
-  #──────────────────────────────────────────────────────────────
+  # Initialize setpoints based on the last phase
   - id: init_setpoints_from_mode
     then:
       - script.execute: publish_mode_setpoints
 
-  #──────────────────────────────────────────────────────────────
-  # Push current setpoints to climate & sensors
-  #──────────────────────────────────────────────────────────────
+  # Push current setpoints to controllers
   - id: activate_setpoints
     then:
       - button.press: submit_values
 
-  #──────────────────────────────────────────────────────────────
-  # Temporary defrost cycle if icing detected
-  #──────────────────────────────────────────────────────────────
+  # Temporary defrost cycle when icing detected
   - id: defrost_cycle
     then:
       - logger.log: "Defrost cycle initiated"
@@ -155,20 +139,10 @@ script:
           mode: COOL
           target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
 
-  #──────────────────────────────────────────────────────────────
-  # Update elapsed‐time sensors
-  #──────────────────────────────────────────────────────────────
+  # Update all elapsed-time sensors
   - id: update_elapsed_times
     then:
       - component.update: elapsed_days
       - component.update: ramp_days
       - component.update: plateau_days
       - component.update: hold_days
-
-  #──────────────────────────────────────────────────────────────
-  # Apply new mode’s setpoints immediately
-  #──────────────────────────────────────────────────────────────
-  - id: apply_current_mode_setpoints
-    mode: restart
-    then:
-      - script.execute: publish_mode_setpoints
