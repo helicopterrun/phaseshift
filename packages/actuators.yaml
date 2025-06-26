@@ -26,22 +26,26 @@ output:
   # DAC outputs for TEC current limiting
   - platform: mcp4728
     id: vref_a_out
+    mcp4728_id: dac_output
     channel: A
     vref: vdd
 
   - platform: mcp4728
     id: vref_b_out
+    mcp4728_id: dac_output
     channel: C
     vref: vdd
 
   - platform: mcp4728
     id: imode_a
+    mcp4728_id: dac_output
     channel: B
     vref: internal
     gain: X1
 
   - platform: mcp4728
     id: imode_b
+    mcp4728_id: dac_output
     channel: D
     vref: internal
     gain: X1
@@ -49,48 +53,48 @@ output:
   # TEC driver control pins
   - platform: gpio
     id: nsleep_a
-    pin: GPIO26
+    pin: ${nsleep_a_pin}
 
   - platform: gpio
     id: nsleep_b
-    pin: GPIO18
+    pin: ${nsleep_b_pin}
 
   - platform: gpio
     id: p_mode
-    pin: GPIO19
+    pin: ${p_mode_pin}
 
   # PWM channels for TEC drivers
   - platform: ledc
     id: pwm_a
-    pin: GPIO13
-    frequency: 19531Hz
+    pin: ${pwm_tec_a_pin}
+    frequency: ${pwm_tec_freq}
 
   - platform: ledc
     id: pwm_b
-    pin: GPIO33
-    frequency: 19531Hz
+    pin: ${pwm_tec_b_pin}
+    frequency: ${pwm_tec_freq}
 
   # PWM channels for fans
   - platform: ledc
     id: fan_hot
-    pin: GPIO32
-    frequency: 25000Hz
+    pin: ${pwm_fan_hot_pin}
+    frequency: ${pwm_fan_freq}
 
   - platform: ledc
     id: fan_cold
-    pin: GPIO25
-    frequency: 25000Hz
+    pin: ${pwm_fan_cold_pin}
+    frequency: ${pwm_fan_freq}
 
   - platform: ledc
     id: fan_circ
-    pin: GPIO17
-    frequency: 25000Hz
+    pin: ${pwm_fan_circ_pin}
+    frequency: ${pwm_fan_freq}
 
 switch:
   # Chamber heater relay
   - platform: gpio
     id: heat
-    pin: GPIO12
+    pin: ${heat_pin}
     name: "Chamber Heat"
     inverted: true
 
