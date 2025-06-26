@@ -1,0 +1,48 @@
+# I²C bus, ADC/DAC, API, OTA, time, outputs, switches, etc.
+i2c:
+  id: i2c_bus_main
+  sda: ${i2c_sda}
+  scl: ${i2c_scl}
+  frequency: 100kHz
+
+ads1115:
+  - address: ${ads1115_address}
+
+mcp4728:
+  - id: dac_output
+    address: ${mcp4728_address}
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "${timezone}"
+    on_time:  # midnight rollover
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - script.execute: update_elapsed_times
+          - script.execute: update_mode_from_elapsed
+
+sensor:
+  - platform: tmp117
+    name: "Cold Side Temperature"
+    id: cold_temp
+    address: ${cold_temp_address}
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 2
+    state_class: measurement
+    filters: [ round: 2 ]
+    update_interval: 10s
+
+  - platform: tmp117
+    name: "Hot Side Temperature"
+    id: hot_temp
+    address: ${hot_temp_address}
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 2
+    state_class: measurement
+    filters: [ round: 2 ]
+    update_interval: 10s
