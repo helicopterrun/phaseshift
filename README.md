@@ -18,3 +18,133 @@ PhaseShift provides three programmable phases—**Ramp**, **Plateau**, and **Hol
 - Tracks **elapsed time per phase** to drive dynamic logic
 
 ---
+
+## Structure
+
+Your ESPHome configuration is organized into discrete packages for clarity and reusability:
+
+```
+/config
+├── phaseshift.yaml          # main entrypoint
+├── secrets.yaml            # sensitive credentials (gitignored)
+└── packages/
+    ├── hardware/           # pin assignments, sensors, raw components
+    ├── controls/           # template buttons, inputs, UI entities
+    ├── sensors/            # temperature, dewpoint, elapsed-time sensors
+    ├── climate/            # climate device definitions (PID loops)
+    ├── actuators/          # relays, fans, heaters, defrost logic
+    ├── scripts/            # custom lambda scripts & phase transitions
+    └── timing/             # schedules, timers, phase-duration logic
+```
+
+This layout keeps each concern isolated so you can drop in or swap out modules without touching the rest of your config.
+
+---
+
+## Secrets
+
+Store sensitive values in a separate `secrets.yaml` file at the root of your config directory. This file is automatically ignored by Git (see `.gitignore`), ensuring your passwords and keys aren’t exposed in version control.
+
+```yaml
+# secrets.yaml
+wifi_ssid: "YOUR_WIFI_SSID"
+wifi_password: "YOUR_WIFI_PASSWORD"
+api_key: "YOUR_ESPHOME_API_KEY"
+ota_pw: "YOUR_OTA_PASSWORD"
+```
+
+In your main YAML (`phaseshift.yaml`), reference these with the `!secret` tag:
+
+```yaml
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# esphome:
+#   name: $device_id
+#   api:
+#     encryption_key: !secret api_key
+#   ota:
+#     password: !secret ota_pw
+```
+
+---
+
+## Substitutions
+
+Below is a full list of all available substitutions in `phaseshift.yaml`, their default values, and what each controls:
+
+```yaml
+substitutions:
+  device_id:  "phaseshift"              # Unique ESPHome node identifier (entity IDs & hostname)
+  device_name: "PhaseShift"             # Human-readable name in Home Assistant
+  use_fahrenheit: "true"                # Use Fahrenheit (true) or Celsius (false) for temperature values
+  temp_unit: "°F"                       # Display suffix for temperature sensors
+  default_max_current: "3.5"            # Default overcurrent trip point (amps) for TEC drivers
+
+  ramp_duration: "8"                    # Length of the Ramp phase (days)
+  plateau_duration: "4"                 # Length of the Plateau phase (days)
+
+  ramp_start_dewpoint: "56.0"           # Starting dew point for Ramp phase (°F)
+  ramp_end_dewpoint: "52.0"             # Ending dew point for Ramp phase (°F)
+  ramp_start_temp: "68.0"               # Starting temperature for Ramp phase (°F)
+  ramp_end_temp: "68.0"                 # Ending temperature for Ramp phase (°F)
+  ramp_start_fan_speed: "100"           # Fan speed at start of Ramp (% output)
+  ramp_end_fan_speed: "10"              # Fan speed at end of Ramp (% output)
+  ramp_start_fan_modulation: "100"      # PWM modulation at start of Ramp (% duty cycle)
+  ramp_end_fan_modulation: "10"         # PWM modulation at end of Ramp (% duty cycle)
+
+  plateau_dewpoint: "52.0"              # Dew point during Plateau phase (°F)
+  plateau_temp: "68.0"                  # Temperature during Plateau phase (°F)
+  plateau_fan_speed: "10"               # Fan speed during Plateau (% output)
+  plateau_fan_modulation: "10"          # PWM modulation during Plateau (% duty cycle)
+
+  hold_dewpoint: "54.0"                 # Dew point during Hold phase (°F)
+  hold_temp: "68.0"                     # Temperature during Hold phase (°F)
+  hold_fan_speed: "10"                  # Fan speed during Hold (% output)
+  hold_fan_modulation: "10"             # PWM modulation during Hold (% duty cycle)
+
+  # Networking (optional static IP)
+  static_ip: "192.168.50.224"           # Static IP address for the node (if used)
+  gateway:   "192.168.50.1"             # Network gateway
+  subnet:    "255.255.255.0"            # Subnet mask
+
+  # I²C pins
+  i2c_sda: "21"                         # GPIO pin for I²C SDA line
+  i2c_scl: "22"                         # GPIO pin for I²C SCL line
+
+  # I²C device addresses
+  ads1115_address:  "0x49"              # I²C address for ADS1115 ADC
+  mcp4728_address:  "0x60"              # I²C address for MCP4728 DAC
+
+  # TEC driver control pins
+  nsleep_a_pin:   "26"                  # GPIO pin for NSLEEP on TEC driver A
+  nsleep_b_pin:   "18"                  # GPIO pin for NSLEEP on TEC driver B
+  p_mode_pin:     "19"                  # GPIO pin to select PWM mode on drivers
+
+  # TEC PWM outputs & frequency
+  pwm_tec_a_pin:  "13"                  # PWM output pin for TEC channel A
+  pwm_tec_b_pin:  "33"                  # PWM output pin for TEC channel B
+  pwm_tec_freq:   "19531Hz"             # PWM frequency for TEC drivers
+
+  # Fan PWM outputs & frequency
+  pwm_fan_hot_pin:  "32"                # PWM pin for hot-side heatsink fan
+  pwm_fan_cold_pin: "25"                # PWM pin for cold-side heatsink fan
+  pwm_fan_circ_pin: "17"                # PWM pin for circulation fan
+  pwm_fan_freq:     "25000Hz"           # PWM frequency for all fans
+
+  # Heater relay pin
+  heat_pin:       "12"                  # GPIO pin for heater relay control
+
+  # Heatsink temperature sensor configuration
+  dallas_pin:         "27"              # GPIO pin for 1-Wire bus (DS18B20 sensors)
+  cold_temp_address:  "0x4B"            # 1-Wire address for cold heatsink sensor
+  hot_temp_address:   "0x48"            # 1-Wire address for hot heatsink sensor
+
+  # SNTP timezone
+  timezone: "America/Los_Angeles"       # Timezone for SNTP synchronization
+```
+
+Each of these substitutions lets you tailor PhaseShift to your hardware, scheduling, and network environment without diving into the lower‑level packages.
+
+
