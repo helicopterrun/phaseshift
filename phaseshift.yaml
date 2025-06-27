@@ -1,14 +1,13 @@
 # phaseshift.yaml
 # PhaseShift Open Environmental Control
-# Version: 2025.06.26.1
+# Version: 2025.06.26.2
 # Developer: @helicopterrun
 
 substitutions:
   device_id:  "phaseshift"
   device_name: "PhaseShift"
-  sensor_driver: "tmp117"   # or "dallas"
-  use_fahrenheit: "true"   # set to "false" if you want native °C
-  temp_unit: "°F"  # set to "°C" if you want native °C
+  use_fahrenheit: "true"
+  temp_unit: "°F"
   default_max_current: "3.5"
 
   ramp_duration: "8"
@@ -67,17 +66,16 @@ substitutions:
 
   # Heatsink temperature sensor configuration
   dallas_pin:         "27"
-  cold_temp_address:  "0x4B"                  # for tmp117 or Dallas ROM
-  hot_temp_address:   "0x48"                  # for tmp117 or Dallas ROM
+  cold_temp_address:  "0x4B"
+  hot_temp_address:   "0x48"
 
   # SNTP timezone
   timezone: "America/Los_Angeles"
 
 packages:
-  hardware:  !include packages/hardware_${sensor_driver}.yaml
+  hardware:  !include packages/hardware_tmp117.yaml
   controls:  !include packages/controls.yaml
-  sensors_common:    !include packages/sensors_common.yaml
-  sensors_driver:    !include packages/sensors_${sensor_driver}.yaml
+  sensors:  !include packages/sensors.yaml
   climate:   !include packages/climate.yaml
   actuators: !include packages/actuators.yaml
   scripts:   !include packages/scripts.yaml
@@ -98,7 +96,32 @@ esp32:
   framework:
     type: arduino
 
+# —————————————————————————————————————————————————
+# Wi-Fi, Logging, API & OTA
+# —————————————————————————————————————————————————
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  manual_ip:
+    static_ip: 192.168.50.224
+    gateway: 192.168.50.1
+    subnet: 255.255.255.0
+
+logger:
+
+api:
+  encryption:
+    key: !secret ss2_api
+ota:
+  - platform: esphome
+    password: !secret ss2_ota
+
 globals:
+  - id: cycle_start_timestamp
+    type: uint32_t
+    restore_value: true
+    initial_value: '0'
   - id: ramp_start_timestamp
     type: uint32_t
     restore_value: true
