@@ -69,7 +69,7 @@ substitutions:
 
 packages:
   remote_files:
-    url: https://github.com/yourusername/PhaseShift
+    url: https://github.com/helicopterrun/phaseshift
     ref: main
     files:
       - phaseshift.yaml
