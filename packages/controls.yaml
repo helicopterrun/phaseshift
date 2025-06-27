@@ -11,8 +11,8 @@ number:
     optimistic: true
     initial_value: ${ramp_start_temp}
     unit_of_measurement: "${temp_unit}"
-    min_value: -40
-    max_value: 212
+    min_value: -100
+    max_value: 100
     step: 0.5
 
   - platform: template
@@ -22,8 +22,8 @@ number:
     optimistic: true
     initial_value: ${ramp_start_dewpoint}
     unit_of_measurement: "${temp_unit}"
-    min_value: -40
-    max_value: 212
+    min_value: -100
+    max_value: 100
     step: 0.5
 
   #—————————————————————————————————————
@@ -32,18 +32,16 @@ number:
   - platform: template
     name: "Max TEC Current"
     id: pwm_max_current_number
-    internal: true
     optimistic: true
     initial_value: ${default_max_current}
     unit_of_measurement: "A"
-    min_value: 0
-    max_value: ${default_max_current}
+    min_value: 0.0
+    max_value: 8.0
     step: 0.1
 
   - platform: template
     name: "Driver Output Level"
     id: tec_pl_number
-    internal: true
     optimistic: true
     initial_value: 0.0
     min_value: 0.0
@@ -84,9 +82,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_start_dewpoint}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
     icon: mdi:weather-fog
 
   - platform: template
@@ -95,9 +93,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_end_dewpoint}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
     icon: mdi:weather-fog
 
   - platform: template
@@ -106,9 +104,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_start_temp}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
     icon: mdi:thermometer
 
   - platform: template
@@ -117,9 +115,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${ramp_end_temp}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0
+    max_value: 100
+    step: 0.1
     icon: mdi:thermometer
 
   - platform: template
@@ -175,9 +173,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${plateau_temp}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0
+    max_value: 100
+    step: 0.1
     icon: mdi:thermometer
 
   - platform: template
@@ -186,9 +184,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${plateau_dewpoint}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0
+    max_value: 100
+    step: 0.1
     icon: mdi:weather-fog
 
   - platform: template
@@ -222,9 +220,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${hold_temp}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
     icon: mdi:thermometer
 
   - platform: template
@@ -233,9 +231,9 @@ number:
     unit_of_measurement: "${temp_unit}"
     optimistic: true
     initial_value: ${hold_dewpoint}
-    min_value: -40
-    max_value: 212
-    step: 0.5
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
     icon: mdi:weather-fog
 
   - platform: template
@@ -270,9 +268,56 @@ number:
     optimistic: true
     initial_value: ${plateau_temp}    # default placeholder; updated by scripts
     min_value: -15.0
-    max_value: 27.0
+    max_value: 100.0
     step: 0.01
     icon: mdi:coolant-temperature
+
+  #—————————————————————————————————————
+  # Cold‐side heatsink ranges
+  #—————————————————————————————————————
+  - platform: template
+    name: "Heatsink Heating Range"
+    id: cold_hs_up_range
+    optimistic: true
+    initial_value: 2.0
+    min_value: 0.0
+    max_value: 10.0
+    step: 0.5
+    icon: mdi:arrow-up-bold
+
+  - platform: template
+    name: "Heatsink Cooling Range"
+    id: cold_hs_dn_range
+    optimistic: true
+    initial_value: -10.0
+    min_value: -15.0
+    max_value: 0.0
+    step: 0.5
+    icon: mdi:arrow-down-bold
+
+  #—————————————————————————————————————
+  # Bias Temperature # Authority of drybulb on cold side temp when near dewpoint target. (default: 2°C)
+  #—————————————————————————————————————
+  - platform: template
+    name: Heatsink Bias
+    id: bias_range
+    optimistic: true
+    initial_value: 2.0
+    min_value: -10.0
+    max_value: 10.0
+    step: 0.5
+
+  #—————————————————————————————————————
+  # Frost limit is the lowest temperature the system will target to prevent frost (default: 2.0°C)
+  #—————————————————————————————————————
+  - platform: template
+    name: Frost Limit
+    id: frost_limit
+    optimistic: true
+    initial_value: 2.0
+    min_value: 0.0
+    max_value: 10.0
+    step: 0.5
 
 #—————————————————————————————————————
 # Phase selector
@@ -300,9 +345,8 @@ select:
 button:
   # Push all setpoints (Drybulb & Dewpoint) into the PID controllers
   - platform: template
-    name: "Submit Setpoints"
+    internal: True
     id: submit_values
-    icon: mdi:check
     on_press:
       then:
         - sensor.template.publish:
@@ -332,9 +376,8 @@ button:
 
   # Apply the maximum current limit to the TEC drivers
   - platform: template
-    name: "Apply Max Current"
+    internal: True
     id: apply_current_settings
-    icon: mdi:flash
     on_press:
       then:
         - output.set_level:
@@ -346,9 +389,8 @@ button:
 
   # Push the driver PWM level out to the TEC channels
   - platform: template
-    name: "Set PWM"
+    internal: True
     id: set_pwm
-    icon: mdi:emoticon-outline
     on_press:
       then:
         - output.set_level:
@@ -357,3 +399,26 @@ button:
         - output.set_level:
             id: pwm_b
             level: !lambda 'return id(tec_pl_number).state;'
+
+  - platform: template
+    name: "Start New Cycle"
+    id: restart_cycle
+    icon: "mdi:restart"
+    on_press:
+      then:
+        - lambda: |-
+            time_t now = id(sntp_time).now().timestamp;
+
+            id(mode).publish_state("Ramp");
+
+            id(cycle_start_timestamp) = now;
+            id(ramp_start_timestamp) = now;
+
+            id(elapsed_days).publish_state(0);
+            id(hold_days).publish_state(0);
+            id(ramp_days).publish_state(0);
+            id(plateau_days).publish_state(0);
+
+        - logger.log:
+            format: "Cycle restarted at UNIX time: %u"
+            args: [ 'id(cycle_start_timestamp)' ]
