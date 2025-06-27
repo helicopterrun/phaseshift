@@ -29,14 +29,14 @@ Your ESPHome configuration is organized into discrete packages for clarity and r
     ├── phaseshift.yaml         # main entrypoint
     ├── secrets.yaml            # sensitive credentials
     └── packages/
-        ├── hardware_dallas     # for hardware using dallas based temperature sensors. includes: pin assignments, sensors, raw components
-        ├── hardware_tmp117     # for hardware using tmp117 based temperature sensors. includes: pin assignments, sensors, raw components
-        ├── controls/           # template buttons, inputs, UI entities
-        ├── sensors/            # temperature, dewpoint, elapsed-time sensors
-        ├── climate/            # climate device definitions (PID loops)
-        ├── actuators/          # relays, fans, heaters, defrost logic
-        ├── scripts/            # custom lambda scripts & phase transitions
-        └── timing/             # schedules, timers, phase-duration logic
+        ├── hardware_dallas.yaml     # for hardware using dallas based temperature sensors
+        ├── hardware_tmp117.yaml     # for hardware using tmp117 based temperature sensors
+        ├── controls.yaml            # template buttons, inputs, UI entities
+        ├── sensors.yaml             # temperature, dewpoint, elapsed-time sensors
+        ├── climate.yaml             # climate device definitions (PID loops)
+        ├── actuators.yaml           # relays, fans, heaters, defrost logic
+        ├── scripts.yaml             # custom lambda scripts & phase transitions
+        └── timing.yaml              # schedules, timers, phase-duration logic
 ```
 
 This layout splits out the main section of the code, so you can drop in or swap out modules without touching the rest of your config.
