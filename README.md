@@ -168,7 +168,7 @@ Each of these substitutions lets you tailor PhaseShift to your hardware, schedul
 ## Config Values to Enter in UI
 
 RAMP
-- Duration: 7 days
+- Duration: 5 days
 - Start Temp: 68.0°F
 - End Temp: 65.0°F
 - Start Dew Point: 58.0°F
@@ -179,7 +179,7 @@ RAMP
 - End Duty: 20 sec/min
 
 PLATEAU
-- Duration: 3 days
+- Duration: 5 days
 - Temp: 65.0°F
 - Dew Point: 52.0°F
 - Speed: 10%
