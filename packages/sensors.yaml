@@ -1,0 +1,599 @@
+# sensors.yaml
+
+sensor:
+
+  #──────────────────────────────────────────────────────────────
+  # 1) RAMP-STAGE DYNAMIC SETPOINTS
+  #──────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Ramp Temperature Setpoint"
+    id: ramp_temp_setpoint_dynamic
+    unit_of_measurement: "${temp_unit}"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      float elapsed = id(ramp_days).state;
+      float start   = atof("${ramp_start_temp}");
+      float end     = atof("${ramp_end_temp}");
+      float dur     = id(ramp_duration).state;
+      if (elapsed <= 0.0)      return start;
+      else if (elapsed >= dur) return end;
+      float slope = (end - start) / dur;
+      return start + slope * elapsed;
+
+  - platform: template
+    name: "Ramp Dewpoint Setpoint"
+    id: ramp_dwpt_setpoint_dynamic
+    unit_of_measurement: "${temp_unit}"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      float elapsed = id(ramp_days).state;
+      float start   = atof("${ramp_start_dewpoint}");
+      float end     = atof("${ramp_end_dewpoint}");
+      float dur     = id(ramp_duration).state;
+      if (elapsed <= 0.0)      return start;
+      else if (elapsed >= dur) return end;
+      float slope = (end - start) / dur;
+      return start + slope * elapsed;
+
+  - platform: template
+    name: "Ramp Fan Speed Setpoint"
+    id: ramp_fan_speed_setpoint_dynamic
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      float elapsed = id(ramp_days).state;
+      float start   = atof("${ramp_start_fan_speed}");
+      float end     = atof("${ramp_end_fan_speed}");
+      float dur     = id(ramp_duration).state;
+      if (elapsed <= 0.0)      return start;
+      else if (elapsed >= dur) return end;
+      float slope = (end - start) / dur;
+      return start + slope * elapsed;
+
+  - platform: template
+    name: "Ramp Fan Modulation Setpoint"
+    id: ramp_fan_modulation_setpoint_dynamic
+    unit_of_measurement: "sec/min"
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      float elapsed = id(ramp_days).state;
+      float start   = atof("${ramp_start_fan_modulation}");
+      float end     = atof("${ramp_end_fan_modulation}");
+      float dur     = id(ramp_duration).state;
+      if (elapsed <= 0.0)      return start;
+      else if (elapsed >= dur) return end;
+      float slope = (end - start) / dur;
+      return start + slope * elapsed;
+
+  #──────────────────────────────────────────────────────────────
+  # 2) CIRCUIT-LOGIC SENSORS (fan command, RH, VPD, elapsed time)
+  #──────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Circulation Fan Commanded Speed"
+    id: circ_fan_command
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |-
+      std::string m = id(mode).state;
+      float speed = 0.0, duty = 0.0;
+      if (m == "Ramp") {
+        speed = id(ramp_fan_speed_setpoint_dynamic).state;
+        duty  = id(ramp_fan_modulation_setpoint_dynamic).state;
+      } else if (m == "Plateau") {
+        speed = id(circ_speed_plateau).state;
+        duty  = id(circ_duty_plateau).state;
+      } else {
+        speed = id(circ_speed_hold).state;
+        duty  = id(circ_duty_hold).state;
+      }
+      if (id(heat).state) return speed;
+      int second = id(sntp_time).now().timestamp % 60;
+      return (duty > 0 && second < duty) ? speed : 0.0;
+    filters:
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+  - platform: template
+    name: "RH Target"
+    id: rh_target
+    unit_of_measurement: "%"
+    device_class: humidity
+    accuracy_decimals: 2
+    state_class: measurement
+    update_interval: 20s
+    lambda: |-
+      float dew = id(dewpoint_celcius).state;
+      float dry = id(drybulb_celcius).state;
+      if (isnan(dew) || isnan(dry)) return NAN;
+      float e_dew = 0.6108 * exp((17.27 * dew) / (dew + 237.3));
+      float e_dry = 0.6108 * exp((17.27 * dry) / (dry + 237.3));
+      return (e_dew / e_dry) * 100.0;
+
+  - platform: template
+    name: "Target Vapor Pressure"
+    id: vapor_pressure_target
+    unit_of_measurement: "kPa"
+    accuracy_decimals: 3
+    state_class: measurement
+    update_interval: 20s
+    lambda: |-
+      float dew = id(dewpoint_celcius).state;
+      if (isnan(dew)) return NAN;
+      return 10.0 * (0.6108 * exp((17.27 * dew) / (dew + 237.3)));
+
+  - platform: template
+    name: "Elapsed Time Since Cycle Start"
+    id: elapsed_days
+    unit_of_measurement: "days"
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      uint32_t now = id(sntp_time).now().timestamp;
+      if (id(cycle_start_timestamp) == 0 || now < id(cycle_start_timestamp))
+        return 0.0;
+      return (now - id(cycle_start_timestamp)) / 86400.0;
+
+  - platform: template
+    name: "Hold Elapsed Days"
+    id: hold_days
+    unit_of_measurement: "days"
+    device_class: duration
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      if (id(hold_start_timestamp) == 0) return 0.0;
+      float elapsed = id(sntp_time).now().timestamp - id(hold_start_timestamp);
+      return elapsed > 0 ? elapsed / 86400.0 : 0.0;
+
+  - platform: template
+    name: "Ramp Elapsed Days"
+    id: ramp_days
+    unit_of_measurement: "days"
+    device_class: duration
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      if (id(ramp_start_timestamp) == 0) return 0.0;
+      float end = (id(mode).state == "Ramp")
+        ? id(sntp_time).now().timestamp
+        : id(plateau_start_timestamp);
+      float elapsed = end - id(ramp_start_timestamp);
+      return elapsed > 0 ? elapsed / 86400.0 : 0.0;
+
+  - platform: template
+    name: "Plateau Elapsed Days"
+    id: plateau_days
+    unit_of_measurement: "days"
+    device_class: duration
+    accuracy_decimals: 2
+    update_interval: never
+    lambda: |-
+      if (id(plateau_start_timestamp) == 0) return 0.0;
+      float end = (id(mode).state == "Plateau")
+        ? id(sntp_time).now().timestamp
+        : id(hold_start_timestamp);
+      float elapsed = end - id(plateau_start_timestamp);
+      return elapsed > 0 ? elapsed / 86400.0 : 0.0;
+
+  #──────────────────────────────────────────────────────────────
+  # 3) AUTOMATIC COLD/HOT FAN ALGORITHMS
+  #──────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Cold Fan Speed"
+    id: cold_fan_speed
+    device_class: speed
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    state_class: measurement
+    update_interval: 10s
+    lambda: |-
+      float chamber   = id(chamber_temp).state;
+      float dew       = id(dewpoint).state;
+      float dry_set   = id(drybulb_celcius).state;
+      float dew_set   = id(dewpoint_celcius).state;
+
+      if (isnan(chamber) || isnan(dew) || isnan(dry_set) || isnan(dew_set)) {
+        return 0.0;
+      }
+
+      float output = 0.0;
+
+      if (chamber <= dry_set) {
+        if (dew > dew_set) {
+          float dew_error = dew - dew_set;
+          float speed     = (dew_error / 3.0) * 50.0;
+          if (speed > 50.0) {
+            speed = 50.0;
+          }
+          if (chamber < dry_set - 1.0) {
+            output = 0.0;
+          } else {
+            output = speed;
+          }
+        }
+      } else {
+        float base_speed = id(drybulb_cool_result).state * 100.0;
+        if (dew > dew_set) {
+          float cold       = id(cold_temp).state;
+          float cold_set   = id(cold_hs_setpoint).state;
+          float dry_action = id(drybulb_cool_result).state;
+          if (!isnan(cold) && !isnan(cold_set) && cold > cold_set) {
+            float overshoot      = cold - cold_set;
+            float k              = 0.1;
+            float base_limit     = 1.0 - k * overshoot;
+            if (base_limit < 0.0) base_limit = 0.0;
+            float penalty_factor = 1.0 - (dry_action * 0.9);
+            if (penalty_factor < 0.1) penalty_factor = 0.1;
+            base_speed *= base_limit * penalty_factor;
+          }
+        }
+        output = base_speed;
+      }
+
+      return round(output);
+    filters:
+      - clamp:
+          min_value: 0
+          max_value: 100
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 1
+          send_first_at: 1
+    on_value:
+      then:
+        - output.set_level:
+            id: fan_cold
+            level: !lambda 'return id(cold_fan_speed).state / 100.0;'
+
+  - platform: template
+    name: "Hot Fan Speed"
+    id: hot_fan_speed
+    unit_of_measurement: "%"
+    device_class: speed
+    accuracy_decimals: 0
+    state_class: measurement
+    update_interval: 10s
+    lambda: |-
+      float cur = id(hot_temp).state;
+      float min = 20.0, max = 23.9;
+      if (isnan(cur)) return 0.0;
+      if (cur <= min) return 0.0;
+      if (cur >= max) return 100.0;
+      return (cur - min) / (max - min) * 100.0;
+    filters:
+      - clamp:
+          min_value: 0
+          max_value: 100
+      - exponential_moving_average:
+          alpha: 0.3
+          send_every: 1
+          send_first_at: 1
+    on_value:
+      then:
+        - output.set_level:
+            id: fan_hot
+            level: !lambda return id(hot_fan_speed).state / 100.0;
+
+  #──────────────────────────────────────────────────────────────
+  # 4) COLD HEATSINK TARGET ALGORITHM
+  #──────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Cold Heatsink Target Calculation"
+    id: cold_calc
+    accuracy_decimals: 1
+    update_interval: 10s
+    lambda: |-
+      float dp_error   = id(dewpoint_error).state;
+      float mid_point  = id(dewpoint_celcius).state;
+      float dry_act    = id(dewpoint_cool_result).state;
+      float hot_lim    = mid_point + id(cold_hs_up_range).state;
+      float cool_act   = id(drybulb_cool_result).state;
+      float bias       = id(bias_range).state;
+      float low_lim;
+      if (id(allow_below_freezing).state)
+        low_lim = mid_point + id(cold_hs_dn_range).state;
+      else
+        low_lim = max(mid_point + id(cold_hs_dn_range).state,
+                      id(frost_limit).state);
+      float range_dn = mid_point - low_lim;
+      float range_up = hot_lim - mid_point;
+      float temp = mid_point;
+      if (dp_error < -0.5) {
+        temp = mid_point - range_dn * dry_act;
+      } else if (dp_error <= 0.5) {
+        temp = mid_point - (range_dn * dry_act + bias * cool_act);
+      } else {
+        temp = mid_point + range_up * cool_act;
+      }
+      return max(low_lim, min(temp, hot_lim));
+    filters:
+      - round: 1
+    on_value:
+      then:
+        - number.set:
+            id: cold_hs_setpoint
+            value: !lambda 'return id(cold_calc).state;'
+        - climate.control:
+            id: pid_cold
+            mode: COOL
+            target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
+
+  #──────────────────────────────────────────────────────────────
+  # 5) INTERNAL & PID TEMPLATE SENSORS
+  #──────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Drybulb Set Point"
+    id: drybulb_celcius
+    device_class: temperature
+    unit_of_measurement: "°C"
+    state_class: measurement
+    filters:
+      - round: 2
+    update_interval: never
+
+  - platform: template
+    name: "Dewpoint Set Point"
+    id: dewpoint_celcius
+    device_class: temperature
+    unit_of_measurement: "°C"
+    state_class: measurement
+    filters:
+      - round: 2
+    update_interval: never
+
+  - platform: pid
+    climate_id: pid_dewpoint
+    name: "Dewpoint Cool Result"
+    id: dewpoint_cool_result
+    type: COOL
+    filters:
+      - multiply: 0.01
+
+  - platform: pid
+    climate_id: pid_drybulb
+    name: "Drybulb Cool Result"
+    id: drybulb_cool_result
+    type: COOL
+    filters:
+      - multiply: 0.01
+
+  - platform: template
+    name: "Dewpoint Error"
+    id: dewpoint_error
+    update_interval: 10s
+    lambda: |-
+      return id(dewpoint_celcius).state - id(dewpoint).state;
+
+  - platform: template
+    name: "Drybulb Error"
+    id: drybulb_error
+    update_interval: 10s
+    lambda: |-
+      return id(drybulb_celcius).state - id(chamber_temp).state;
+
+  - platform: template
+    name: "Driver Current"
+    id: tec_current
+    unit_of_measurement: "A"
+    device_class: current
+    accuracy_decimals: 2
+    update_interval: 1s
+    lambda: |-
+      return id(ipropi_a).state + id(ipropi_b).state;
+
+  - platform: template
+    name: "Saturated Vapor Pressure"
+    id: saturated_vapor_pressure
+    unit_of_measurement: "kPa"
+    accuracy_decimals: 3
+    update_interval: 18s
+    lambda: |-
+      float t = id(chamber_temp).state;
+      if (isnan(t)) return NAN;
+      return 0.6108 * exp((17.27 * t) / (t + 237.3));
+
+  - platform: template
+    name: "Actual Vapor Pressure"
+    id: actual_vapor_pressure
+    unit_of_measurement: "kPa"
+    accuracy_decimals: 3
+    update_interval: 20s
+    lambda: |-
+      float t = id(chamber_temp).state;
+      float h = id(chamber_rh).state;
+      if (isnan(t) || isnan(h)) return NAN;
+      float es = 0.6108 * exp((17.27 * t) / (t + 237.3));
+      return es * (h / 100.0);
+
+  - platform: template
+    name: "Dew Point"
+    id: dewpoint
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    update_interval: 20s
+    lambda: |-
+      float ea = id(actual_vapor_pressure).state;
+      float log_div = log(ea / 0.6108);
+      return (237.3 * log_div) / (17.27 - log_div);
+
+  - platform: template
+    name: "Icing Detector"
+    id: icing_detector
+    update_interval: 20s
+    lambda: |-
+      if (id(cold_temp).state < 1.0 && id(tec_pl_number).state > 0.8)
+        return 1.0;
+      return 0.0;
+    on_value_range:
+      - above: 0.5
+        then:
+          - script.execute: defrost_cycle
+
+  #──────────────────────────────────────────────────────────────
+  # 6) RAW HARDWARE SENSORS
+  #──────────────────────────────────────────────────────────────
+  - platform: sht3xd
+    temperature:
+      name: "Probe Temperature"
+      id: chamber_temp
+      accuracy_decimals: 2
+      filters:
+        - round: 2
+    humidity:
+      name: "Probe Humidity"
+      id: chamber_rh
+      accuracy_decimals: 2
+      filters:
+        - round: 2
+    address: 0x44
+    update_interval: 15s
+
+  - platform: bme280_i2c
+    address: 0x76
+    iir_filter: 16x
+    temperature:
+      name: "Ambient Temperature"
+      id: amb_temp
+    pressure:
+      name: "Ambient Pressure"
+    humidity:
+      name: "Ambient Humidity"
+    update_interval: 120s
+
+  - platform: ads1115
+    multiplexer: 'A0_GND'
+    gain: 6.144
+    id: ipropi_a
+    update_interval: 30s
+    filters:
+      - lambda: |-
+          return x / 0.6825;
+
+  - platform: ads1115
+    multiplexer: 'A1_GND'
+    gain: 6.144
+    id: ipropi_b
+    update_interval: 30s
+    filters:
+      - lambda: |-
+          return x / 0.6825;
+
+  - platform: ads1115
+    multiplexer: 'A2_GND'
+    gain: 4.096
+    id: vref_a_in
+    update_interval: 120s
+
+  - platform: ads1115
+    multiplexer: 'A3_GND'
+    gain: 4.096
+    id: vref_b_in
+    update_interval: 120s
+
+  - platform: pulse_counter
+    pin:
+      number: 34
+      mode:
+        input: true
+    name: "Hot Fan RPM"
+    id: rpm_hot
+    unit_of_measurement: "RPM"
+    accuracy_decimals: 0
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    filters:
+      - multiply: 0.5
+      - round: 2
+    update_interval: 5s
+
+  - platform: pulse_counter
+    pin:
+      number: 16
+      mode:
+        input: true
+    name: "Cold Fan RPM"
+    id: rpm_cold
+    unit_of_measurement: "RPM"
+    accuracy_decimals: 0
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    filters:
+      - multiply: 0.5
+      - round: 2
+    update_interval: 5s
+
+  - platform: pulse_counter
+    pin:
+      number: 35
+      mode:
+        input: true
+    name: "Circulation Fan RPM"
+    id: rpm_circ
+    unit_of_measurement: "RPM"
+    accuracy_decimals: 0
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+    filters:
+      - multiply: 0.5
+      - round: 2
+    update_interval: 5s
+
+binary_sensor:
+  - platform: template
+    id: sponge_dry
+    name: "Add Water"
+    device_class: problem
+    lambda: |-
+      return (id(dewpoint_error).state > 1.0);
+
+text_sensor:
+  - platform: template
+    name: "Estimated Cycle Completion"
+    id: cycle_complete
+    icon: "mdi:calendar-end"
+    lambda: |-
+      if (id(cycle_start_timestamp) == 0) {
+        return std::string("");
+      }
+
+      float ramp_days = id(ramp_duration).state;
+      float plateau_days = id(plateau_duration).state;
+      time_t start = id(cycle_start_timestamp);
+      time_t end = start + (uint32_t)((ramp_days + plateau_days) * 86400);
+
+      char buffer[64];
+      strftime(buffer, sizeof(buffer), "%B %e, %Y at %I:%M %p", localtime(&end));
+      return std::string(buffer);
+
+  - platform: template
+    name: "Total Time Elapsed"
+    id: total_time_formatted
+    icon: "mdi:clock-outline"
+    lambda: |-
+      if (id(cycle_start_timestamp) == 0) {
+        return std::string("00d 00h 00m");
+      }
+
+      time_t now = id(sntp_time).now().timestamp;
+      if (now < id(cycle_start_timestamp)) {
+        return std::string("00d 00h 00m");
+      }
+
+      uint32_t elapsed = now - id(cycle_start_timestamp);
+      int days = elapsed / 86400;
+      int hours = (elapsed % 86400) / 3600;
+      int minutes = (elapsed % 3600) / 60;
+
+      char buffer[32];
+      snprintf(buffer, sizeof(buffer), "%02dd %02dh %02dm", days, hours, minutes);
+      return std::string(buffer);
