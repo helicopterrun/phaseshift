@@ -1,4 +1,10 @@
-# 1-Wire bus instead of I²C
+i2c:
+  id: i2c_bus_main
+  sda: ${i2c_sda}
+  scl: ${i2c_scl}
+  frequency: 400khz
+  timeout: 10ms
+
 one_wire:
   - platform: gpio
     id: ow_bus
@@ -33,7 +39,8 @@ sensor:
     unit_of_measurement: "°C"
     accuracy_decimals: 2
     state_class: measurement
-    filters: [ round: 2 ]
+    filters:
+      - round: 2
     update_interval: 10s
 
   - platform: dallas_temp
@@ -45,5 +52,6 @@ sensor:
     unit_of_measurement: "°C"
     accuracy_decimals: 2
     state_class: measurement
-    filters: [ round: 2 ]
+    filters:
+      - round: 2
     update_interval: 10s
