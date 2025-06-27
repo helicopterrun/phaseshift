@@ -191,7 +191,7 @@ HOLD
 - Speed: 10%
 - Duty: 30 sec/min
 
-![image](https://github.com/user-attachments/assets/b4d39728-36bb-48df-95d9-817ae02d3543)
+![image](https://github.com/user-attachments/assets/56ba16ce-8eea-4b9c-a955-2428b5891d26)
 
 ![image](https://github.com/user-attachments/assets/71b1ff27-052e-48f0-933e-4ac3f776e5a6)
 
