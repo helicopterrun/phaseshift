@@ -60,16 +60,16 @@ ota_pw: "YOUR_OTA_PASSWORD"
 In your main YAML (`phaseshift.yaml`), reference these with the `!secret` tag:
 
 ```yaml
+esphome:
+  name: $device_id
+  api:
+    encryption_key: !secret api_key
+  ota:
+    password: !secret ota_pw
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
-# esphome:
-#   name: $device_id
-#   api:
-#     encryption_key: !secret api_key
-#   ota:
-#     password: !secret ota_pw
 ```
 
 ---
