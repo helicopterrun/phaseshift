@@ -98,7 +98,6 @@ script:
   - id: return_to_default
     then:
       - script.execute: restore_mode
-      - script.execute: init_setpoints_from_mode
       - script.execute: update_circulation_fan
 
   - id: restore_mode
@@ -106,11 +105,6 @@ script:
       - select.set:
           id: mode
           option: !lambda 'return id(last_mode);'
-
-  # Initialize setpoints based on the last phase
-  - id: init_setpoints_from_mode
-    then:
-      - script.execute: publish_mode_setpoints
 
   # Push current setpoints to controllers
   - id: activate_setpoints
@@ -139,3 +133,19 @@ script:
       - component.update: ramp_days
       - component.update: plateau_days
       - component.update: hold_days
+
+  #──────────────────────────────────────────────────────────────
+  # Update all dynamic ramp/plateau/hold setpoints, circulation fan,
+  # and republish current mode setpoints
+  #──────────────────────────────────────────────────────────────
+  - id: update_dynamic_setpoints
+    then:
+      # Recompute the four ramp dynamic setpoints
+      - component.update: ramp_temp_setpoint_dynamic
+      - component.update: ramp_dwpt_setpoint_dynamic
+      - component.update: ramp_fan_speed_setpoint_dynamic
+      - component.update: ramp_fan_modulation_setpoint_dynamic
+      # Also update circulation fan command if in Ramp
+      - script.execute: update_circulation_fan
+      # Finally republish whichever setpoints correspond to the current mode
+      - script.execute: publish_mode_setpoints
