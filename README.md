@@ -25,16 +25,17 @@ Your ESPHome configuration is organized into discrete packages for clarity and r
 
 ```
 /config
-├── phaseshift.yaml          # main entrypoint
-├── secrets.yaml            # sensitive credentials (gitignored)
-└── packages/
-    ├── hardware/           # pin assignments, sensors, raw components
-    ├── controls/           # template buttons, inputs, UI entities
-    ├── sensors/            # temperature, dewpoint, elapsed-time sensors
-    ├── climate/            # climate device definitions (PID loops)
-    ├── actuators/          # relays, fans, heaters, defrost logic
-    ├── scripts/            # custom lambda scripts & phase transitions
-    └── timing/             # schedules, timers, phase-duration logic
+├── esphome/
+    ├── phaseshift.yaml          # main entrypoint
+    ├── secrets.yaml            # sensitive credentials (gitignored)
+    └── packages/
+        ├── hardware/           # pin assignments, sensors, raw components
+        ├── controls/           # template buttons, inputs, UI entities
+        ├── sensors/            # temperature, dewpoint, elapsed-time sensors
+        ├── climate/            # climate device definitions (PID loops)
+        ├── actuators/          # relays, fans, heaters, defrost logic
+        ├── scripts/            # custom lambda scripts & phase transitions
+        └── timing/             # schedules, timers, phase-duration logic
 ```
 
 This layout keeps each concern isolated so you can drop in or swap out modules without touching the rest of your config.
