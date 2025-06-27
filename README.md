@@ -151,4 +151,54 @@ substitutions:
 
 Each of these substitutions lets you tailor PhaseShift to your hardware, scheduling, and network environment without diving into the lower‑level packages.
 
+## Reccomended Phase Structure for Cannabis Drying
+
+| Phase       | Duration (Days) | Tdb Start → End (°F) | Td Start → End (°F) | Notes                                    |
+| ----------- | --------------- | -------------------- | ------------------- | ---------------------------------------- |
+| **Ramp**    | 7.0             | 68.0 → 64.4          | 58.1 → 51.8         | Smooth taper toward target aw (\~0.62)   |
+| **Plateau** | 3.0             | 64.4 → 64.4          | 51.8 → 52.7         | Mild dewpoint recovery for equilibration |
+| **Hold**    | ∞               | 64.4                 | 52.7                | Final holding phase for stabilization    |
+
+| Phase       | Speed Start → End | Duty Start → End  | Notes                                    |
+| ----------- | ----------------- | ----------------- | ---------------------------------------- |
+| **Ramp**    | 100% → 40%        | 60s/min → 20s/min | Stronger early air exchange tapering off |
+| **Plateau** | 10%               | 30s/min           | Gentle air movement for equilibration    |
+| **Hold**    | 10%               | 30s/min           | Minimal airflow to avoid overdry risk    |
+
+## Config Values to Enter in UI
+
+RAMP
+- Duration: 7 days
+
+- Start Temp: 68.0°F
+
+- End Temp: 64.4°F
+
+- Start Dew Point: 58.1°F
+
+- End Dew Point: 51.8°F
+
+- Start Speed: 100%
+
+- End Speed: 40%
+
+- Start Duty: 60 sec/min
+
+- End Duty: 20 sec/min
+
+PLATEAU
+- Duration: 3 days
+- Temp: 64.4°F
+- Dew Point: 52.7°F
+- Speed: 10%
+- Duty: 30 sec/min
+
+HOLD
+- Temp: 64.4°F
+- Dew Point: 52.7°F
+- Speed: 10%
+- Duty: 30 sec/min
+
+
+
 
