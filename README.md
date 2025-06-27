@@ -29,7 +29,8 @@ Your ESPHome configuration is organized into discrete packages for clarity and r
     ├── phaseshift.yaml         # main entrypoint
     ├── secrets.yaml            # sensitive credentials
     └── packages/
-        ├── hardware/           # pin assignments, sensors, raw components
+        ├── hardware_dallas     # for hardware using dallas based temperature sensors. includes: pin assignments, sensors, raw components
+        ├── hardware_tmp117     # for hardware using tmp117 based temperature sensors. includes: pin assignments, sensors, raw components
         ├── controls/           # template buttons, inputs, UI entities
         ├── sensors/            # temperature, dewpoint, elapsed-time sensors
         ├── climate/            # climate device definitions (PID loops)
