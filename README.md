@@ -181,7 +181,7 @@ RAMP
 PLATEAU
 - Duration: 5 days
 - Temp: 65.0°F
-- Dew Point: 52.0°F
+- Dew Point: 51.7°F
 - Speed: 10%
 - Duty: 30 sec/min
 
@@ -191,7 +191,9 @@ HOLD
 - Speed: 10%
 - Duty: 30 sec/min
 
-![image](https://github.com/user-attachments/assets/561ac315-3315-48a0-9b78-edda02fecd9a)
+![image](https://github.com/user-attachments/assets/b4d39728-36bb-48df-95d9-817ae02d3543)
+
+![image](https://github.com/user-attachments/assets/71b1ff27-052e-48f0-933e-4ac3f776e5a6)
 
 ## Comparing the reccomended settings to other options
 
