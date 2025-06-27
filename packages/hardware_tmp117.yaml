@@ -1,4 +1,3 @@
-# I²C bus, ADC/DAC, API, OTA, time, outputs, switches, etc.
 i2c:
   id: i2c_bus_main
   sda: ${i2c_sda}
@@ -16,7 +15,7 @@ time:
   - platform: sntp
     id: sntp_time
     timezone: "${timezone}"
-    on_time:  # midnight rollover
+    on_time:
       - seconds: 0
         minutes: 0
         hours: 0
@@ -33,7 +32,8 @@ sensor:
     unit_of_measurement: "°C"
     accuracy_decimals: 2
     state_class: measurement
-    filters: [ round: 2 ]
+    filters:
+      - round: 2
     update_interval: 10s
 
   - platform: tmp117
@@ -44,5 +44,6 @@ sensor:
     unit_of_measurement: "°C"
     accuracy_decimals: 2
     state_class: measurement
-    filters: [ round: 2 ]
+    filters:
+      - round: 2
     update_interval: 10s
