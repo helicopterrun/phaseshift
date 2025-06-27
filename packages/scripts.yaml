@@ -2,7 +2,9 @@
 
 script:
 
+  #──────────────────────────────────────────────────────────────
   # Publish the correct setpoints for the current phase
+  #──────────────────────────────────────────────────────────────
   - id: publish_mode_setpoints
     then:
       - lambda: |-
@@ -14,7 +16,7 @@ script:
           } else if (m == "Plateau") {
             db = id(plateau_temp).state;
             dp = id(plateau_dewpoint).state;
-          } else {  # Hold
+          } else {
             db = id(hold_temp).state;
             dp = id(hold_dewpoint).state;
           }
@@ -22,7 +24,9 @@ script:
           id(dewpoint_setpoint).publish_state(dp);
       - script.execute: activate_setpoints
 
+  #──────────────────────────────────────────────────────────────
   # Automatically change phase based on elapsed days
+  #──────────────────────────────────────────────────────────────
   - id: update_mode_from_elapsed
     mode: restart
     then:
@@ -94,7 +98,6 @@ script:
   - id: return_to_default
     then:
       - script.execute: restore_mode
-      - script.execute: init_units
       - script.execute: init_setpoints_from_mode
       - script.execute: update_circulation_fan
 
@@ -103,16 +106,6 @@ script:
       - select.set:
           id: mode
           option: !lambda 'return id(last_mode);'
-
-  - id: init_units
-    then:
-      - if:
-          condition:
-            lambda: 'return ${use_fahrenheit};'
-          then:
-            - switch.turn_on: use_fahrenheit
-          else:
-            - switch.turn_off: use_fahrenheit
 
   # Initialize setpoints based on the last phase
   - id: init_setpoints_from_mode
