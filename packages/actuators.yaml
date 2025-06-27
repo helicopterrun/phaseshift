@@ -1,6 +1,27 @@
 # actuators.yaml
 
 output:
+  # Heater Output (Sigma-Delta) → drives the heat switch
+  - platform: sigma_delta_output
+    update_interval: 10s
+    id: heater_output
+    turn_on_action:
+      then:
+        - switch.turn_on: heat
+    turn_off_action:
+      then:
+        - switch.turn_off: heat
+
+  # Dummy “output” for Dewpoint PID → simply logs the value
+  - platform: template
+    id: dewpoint_pid_output
+    type: float
+    write_action:
+      # you can log or route this into another output if you like
+      - logger.log:
+          format: "Dewpoint PID output: %.3f"
+          args: [ 'state' ]
+
   # TEC output level (writes to PWM number then presses set_pwm)
   - platform: template
     id: tec_output
