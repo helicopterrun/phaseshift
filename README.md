@@ -26,8 +26,8 @@ Your ESPHome configuration is organized into discrete packages for clarity and r
 ```
 /config
 ├── esphome/
-    ├── phaseshift.yaml          # main entrypoint
-    ├── secrets.yaml            # sensitive credentials (gitignored)
+    ├── phaseshift.yaml         # main entrypoint
+    ├── secrets.yaml            # sensitive credentials
     └── packages/
         ├── hardware/           # pin assignments, sensors, raw components
         ├── controls/           # template buttons, inputs, UI entities
@@ -38,13 +38,15 @@ Your ESPHome configuration is organized into discrete packages for clarity and r
         └── timing/             # schedules, timers, phase-duration logic
 ```
 
-This layout keeps each concern isolated so you can drop in or swap out modules without touching the rest of your config.
+This layout splits out the main section of the code, so you can drop in or swap out modules without touching the rest of your config.
 
 ---
 
 ## Secrets
 
-Store sensitive values in a separate `secrets.yaml` file at the root of your config directory. This file is automatically ignored by Git (see `.gitignore`), ensuring your passwords and keys aren’t exposed in version control.
+# It is highly recommended to use secrets
+
+Store sensitive values in a separate `secrets.yaml` file at the root of your config directory.
 
 ```yaml
 # secrets.yaml
