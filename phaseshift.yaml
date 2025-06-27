@@ -1,6 +1,6 @@
 # phaseshift.yaml
 # PhaseShift Open Environmental Control
-# Version: 2025.06.26.3
+# Version: 2025.06.27.1
 # Developer: @helicopterrun
 
 substitutions:
@@ -31,6 +31,11 @@ substitutions:
   hold_temp: "68.0"
   hold_fan_speed: "10"
   hold_fan_modulation: "10"
+
+  # Networking (optional static IP)
+  static_ip: "192.168.50.224"
+  gateway:   "192.168.50.1"
+  subnet:    "255.255.255.0"
 
   # I²C pins
   i2c_sda: "21"
@@ -68,30 +73,21 @@ substitutions:
   timezone: "America/Los_Angeles"
 
 packages:
-  remote_files:
-    url: https://github.com/helicopterrun/phaseshift
-    ref: main
-    files:
-      - phaseshift.yaml
-      - packages/hardware_tmp117.yaml
-      - packages/controls.yaml
-      - packages/sensors.yaml
-      - packages/climate.yaml
-      - packages/actuators.yaml
-      - packages/scripts.yaml
-      - packages/timing.yaml
+  hardware:  !include packages/hardware_tmp117.yaml
+  controls:  !include packages/controls.yaml
+  sensors:  !include packages/sensors.yaml
+  climate:   !include packages/climate.yaml
+  actuators: !include packages/actuators.yaml
+  scripts:   !include packages/scripts.yaml
+  timing:    !include packages/timing.yaml
 
 esphome:
   name: $device_id
   friendly_name: $device_name
   name_add_mac_suffix: true
-  project:
-    name: helicopterrun.phaseshift
-    version: "2025.06.26.3"
 
   on_boot:
     then:
-      - script.execute: return_to_default
       - script.execute: ti_driver_startup
 
 esp32:
