@@ -6,6 +6,10 @@ PhaseShift provides three programmable phases—**Ramp**, **Plateau**, and **Hol
 
 ---
 
+## New custom hardware coming soon!!
+
+---
+
 ## Features
 
 - **Ramp** temperature, dewpoint, fan speed, and modulation linearly over a user-defined period
