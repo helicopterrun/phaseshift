@@ -13,13 +13,20 @@ sensor:
     update_interval: never
     lambda: |-
       float elapsed = id(ramp_days).state;
-      float start   = atof("${ramp_start_temp}");
-      float end     = atof("${ramp_end_temp}");
+      float start   = id(ramp_start_temp).state;
+      float end     = id(ramp_end_temp).state;
       float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0)      return start;
-      else if (elapsed >= dur) return end;
+      if (elapsed <= 0.0f)      return start;
+      else if (elapsed >= dur)  return end;
       float slope = (end - start) / dur;
       return start + slope * elapsed;
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Ramp";'
+            then:
+              - script.execute: publish_mode_setpoints
 
   - platform: template
     name: "Ramp Dewpoint Setpoint"
@@ -29,13 +36,20 @@ sensor:
     update_interval: never
     lambda: |-
       float elapsed = id(ramp_days).state;
-      float start   = atof("${ramp_start_dewpoint}");
-      float end     = atof("${ramp_end_dewpoint}");
+      float start   = id(ramp_start_dewpoint).state;
+      float end     = id(ramp_end_dewpoint).state;
       float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0)      return start;
-      else if (elapsed >= dur) return end;
+      if (elapsed <= 0.0f)      return start;
+      else if (elapsed >= dur)  return end;
       float slope = (end - start) / dur;
       return start + slope * elapsed;
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Ramp";'
+            then:
+              - script.execute: publish_mode_setpoints
 
   - platform: template
     name: "Ramp Fan Speed Setpoint"
@@ -98,6 +112,11 @@ sensor:
       - clamp:
           min_value: 0
           max_value: 100
+    on_value:
+      then:
+        - output.set_level:
+            id: fan_circ
+            level: !lambda 'return id(circ_fan_command).state / 100.0;'
 
   - platform: template
     name: "RH Target"
