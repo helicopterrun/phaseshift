@@ -8,34 +8,29 @@ substitutions:
   device_name: "PhaseShift"
   use_fahrenheit: "true"
   temp_unit: "°F"
-  default_max_current: "3.5"
+  default_max_current: "4.5"
 
   ramp_duration: "8"
   plateau_duration: "4"
 
-  ramp_start_dewpoint: "56.0"
-  ramp_end_dewpoint: "52.0"
-  ramp_start_temp: "68.0"
-  ramp_end_temp: "68.0"
-  ramp_start_fan_speed: "100"
-  ramp_end_fan_speed: "10"
-  ramp_start_fan_modulation: "100"
-  ramp_end_fan_modulation: "10"
+  ramp_start_dewpoint: "81.0"
+  ramp_end_dewpoint: "69.5.0"
+  ramp_start_temp: "85.0"
+  ramp_end_temp: "85.0"
+  ramp_start_fan_speed: "0"
+  ramp_end_fan_speed: "0"
+  ramp_start_fan_modulation: "60"
+  ramp_end_fan_modulation: "60"
 
-  plateau_dewpoint: "52.0"
-  plateau_temp: "68.0"
-  plateau_fan_speed: "10"
-  plateau_fan_modulation: "10"
+  plateau_dewpoint: "36.0"
+  plateau_temp: "41.0"
+  plateau_fan_speed: "0"
+  plateau_fan_modulation: "60"
 
-  hold_dewpoint: "54.0"
-  hold_temp: "68.0"
-  hold_fan_speed: "10"
-  hold_fan_modulation: "10"
-
-  # Networking (optional static IP)
-  static_ip: "192.168.50.224"
-  gateway:   "192.168.50.1"
-  subnet:    "255.255.255.0"
+  hold_dewpoint: "36.0"
+  hold_temp: "41.0"
+  hold_fan_speed: "0"
+  hold_fan_modulation: "60"
 
   # I²C pins
   i2c_sda: "21"
@@ -66,8 +61,8 @@ substitutions:
 
   # Heatsink temperature sensor configuration
   dallas_pin:         "27"
-  cold_temp_address:  "0x4B"
-  hot_temp_address:   "0x48"
+  cold_temp_address:  "0x35482f0087c5a728"
+  hot_temp_address:   "0x48759500879e6f28"
 
   # SNTP timezone
   timezone: "America/Los_Angeles"
