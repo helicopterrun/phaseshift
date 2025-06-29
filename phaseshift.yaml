@@ -1,6 +1,6 @@
 # phaseshift.yaml
 # PhaseShift Open Environmental Control
-# Version: 2025.06.27.1
+# Version: 2025.06.29.1
 # Developer: @helicopterrun
 
 substitutions:
@@ -73,7 +73,7 @@ substitutions:
   timezone: "America/Los_Angeles"
 
 packages:
-  hardware:  !include packages/hardware_tmp117.yaml
+  hardware:  !include packages/hardware_dallas.yaml
   controls:  !include packages/controls.yaml
   sensors:  !include packages/sensors.yaml
   climate:   !include packages/climate.yaml
@@ -103,18 +103,14 @@ wifi:
   ap:
     password: "phaseshift"
 
-# In combination with the `ap` this allows the user
-# to provision wifi credentials to the device.
 captive_portal:
 
-# Sets up Bluetooth LE (Only on ESP32) to allow the user
-# to provision wifi credentials to the device.
 esp32_improv:
   authorizer: none
 
 dashboard_import:
-  package_import_url: helicopterrun/phaseshift/phaseshift.yaml@2025.06.26.2⁩
-  packages: !git "https://github.com/yourusername/PhaseShift.git@main"
+  package_import_url: helicopterrun/phaseshift/phaseshift.yaml@2025.06.29.1⁩
+  packages: !git "https://github.com/helicopterrun/phaseshift.git@main"
   import_full_config: false # or true
 
 logger:
