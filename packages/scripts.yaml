@@ -22,47 +22,117 @@ script:
           }
           id(drybulb_setpoint).publish_state(db);
           id(dewpoint_setpoint).publish_state(dp);
-      - script.execute: activate_setpoints
+      - button.press: submit_values
 
-  #──────────────────────────────────────────────────────────────
-  # Automatically change phase based on elapsed days
-  #──────────────────────────────────────────────────────────────
+  # ---------------------------------------------------------------------------
+  # update_mode_from_elapsed - Enhanced Auto-Advancement
+  # ---------------------------------------------------------------------------
+  # Automatically advances phases based on elapsed time vs configured durations.
+  # Only executes when auto_advance_enabled switch is ON.
+  #
+  # Progression Logic:
+  #   1. If in Ramp AND elapsed >= ramp_duration → switch to Plateau
+  #   2. If in Plateau AND elapsed >= plateau_duration → switch to Hold
+  #   3. If in Hold → do nothing (Hold is indefinite)
+  #
+  # Safety Features:
+  #   - Only advances forward, never backward
+  #   - Logs all automatic transitions with timestamps
+  #   - Uses existing mode buttons (no duplicate timestamp logic)
+  #   - Can be interrupted/disabled at any time
+  #
+  # Design Note:
+  #   We use the mode buttons (switch_to_plateau, switch_to_hold) rather than
+  #   directly manipulating the mode select. This ensures:
+  #     - Timestamps are set correctly
+  #     - Setpoints are published
+  #     - All on_value triggers fire properly
+  #     - Behavior matches manual mode changes
+  # ---------------------------------------------------------------------------
   - id: update_mode_from_elapsed
-    mode: restart
+    mode: single  # Prevent overlapping executions
     then:
+      - lambda: |-
+          std::string current_mode = id(mode).state;
+          ESP_LOGD("auto_advance", "Checking phase advancement. Current mode: %s", 
+                   current_mode.c_str());
+
+      # -----------------------------------------------------------------------
+      # Check 1: Ramp → Plateau Transition
+      # -----------------------------------------------------------------------
       - if:
           condition:
-            lambda: 'return id(elapsed_days).state < id(ramp_duration).state;'
+            and:
+              # Must be in Ramp mode
+              - lambda: 'return id(mode).state == "Ramp";'
+              
+              # Elapsed time must exceed configured duration
+              - lambda: |-
+                  uint32_t elapsed = id(ramp_elapsed);
+                  uint32_t duration = id(ramp_duration_s).state;
+                  
+                  ESP_LOGD("auto_advance", "Ramp check: elapsed=%u s, duration=%u s", 
+                           elapsed, duration);
+                  
+                  return elapsed >= duration;
           then:
-            - if:
-                condition:
-                  lambda: 'return id(mode).state != "Ramp";'
-                then:
-                  - select.set:
-                      id: mode
-                      option: "Ramp"
+            - logger.log:
+                format: "AUTO-ADVANCE: Ramp duration complete (%u/%u seconds). Advancing to Plateau."
+                level: INFO
+                args: ['id(ramp_elapsed)', 'uint32_t(id(ramp_duration_s).state)']
+            
+            # Use existing button to ensure proper state management
+            - button.press: switch_to_plateau
+            
+            - logger.log:
+                format: "AUTO-ADVANCE: Successfully transitioned to Plateau at %u"
+                level: INFO
+                args: ['id(sntp_time).now().timestamp']
+
+      # -----------------------------------------------------------------------
+      # Check 2: Plateau → Hold Transition
+      # -----------------------------------------------------------------------
       - if:
           condition:
-            lambda: 'return id(elapsed_days).state >= id(ramp_duration).state && id(elapsed_days).state < (id(ramp_duration).state + id(plateau_duration).state);'
+            and:
+              # Must be in Plateau mode
+              - lambda: 'return id(mode).state == "Plateau";'
+              
+              # Elapsed time must exceed configured duration
+              - lambda: |-
+                  uint32_t elapsed = id(plateau_elapsed);
+                  uint32_t duration = id(plateau_duration_s).state;
+                  
+                  ESP_LOGD("auto_advance", "Plateau check: elapsed=%u s, duration=%u s", 
+                           elapsed, duration);
+                  
+                  return elapsed >= duration;
           then:
-            - if:
-                condition:
-                  lambda: 'return id(mode).state != "Plateau";'
-                then:
-                  - select.set:
-                      id: mode
-                      option: "Plateau"
+            - logger.log:
+                format: "AUTO-ADVANCE: Plateau duration complete (%u/%u seconds). Advancing to Hold."
+                level: INFO
+                args: ['id(plateau_elapsed)', 'uint32_t(id(plateau_duration_s).state)']
+            
+            # Use existing button to ensure proper state management
+            - button.press: switch_to_hold
+            
+            - logger.log:
+                format: "AUTO-ADVANCE: Successfully transitioned to Hold at %u"
+                level: INFO
+                args: ['id(sntp_time).now().timestamp']
+
+      # -----------------------------------------------------------------------
+      # Hold Mode (No Action)
+      # -----------------------------------------------------------------------
+      # Hold phase is indefinite - no automatic transition.
+      # User must manually start a new cycle if desired.
+      # -----------------------------------------------------------------------
       - if:
           condition:
-            lambda: 'return id(elapsed_days).state >= (id(ramp_duration).state + id(plateau_duration).state);'
+            lambda: 'return id(mode).state == "Hold";'
           then:
-            - if:
-                condition:
-                  lambda: 'return id(mode).state != "Hold";'
-                then:
-                  - select.set:
-                      id: mode
-                      option: "Hold"
+            - lambda: |-
+                ESP_LOGV("auto_advance", "In Hold mode - no auto-advance action");
 
   # Update the circulation fan output
   - id: update_circulation_fan
@@ -114,13 +184,13 @@ script:
   # Temporary defrost cycle when icing detected
   - id: defrost_cycle
     then:
-      - logger.log: "Defrost cycle initiated"
+      - logger.log: "Defrost cycle started"
       - climate.control:
           id: pid_cold
           mode: HEAT_COOL
           target_temperature: 5°C
       - delay: 5min
-      - logger.log: "Resuming normal cooling"
+      - logger.log: "Defrost complete, resuming normal cooling"
       - climate.control:
           id: pid_cold
           mode: COOL
@@ -129,10 +199,27 @@ script:
   # Update all elapsed-time sensors
   - id: update_elapsed_times
     then:
-      - component.update: elapsed_days
-      - component.update: ramp_days
-      - component.update: plateau_days
-      - component.update: hold_days
+      - component.update: total_time_formatted
+
+      - if:
+          condition:
+            lambda: 'return id(mode).state == "Ramp";'
+          then:
+            - component.update: ramp_time_elapsed
+
+      - if:
+          condition:
+            lambda: 'return id(mode).state == "Plateau";'
+          then:
+            - component.update: plateau_time_elapsed
+
+      - if:
+          condition:
+            lambda: 'return id(mode).state == "Hold";'
+          then:
+            - component.update: hold_time_elapsed
+
+      - script.execute: update_dynamic_setpoints
 
   #──────────────────────────────────────────────────────────────
   # Update all dynamic ramp/plateau/hold setpoints, circulation fan,
@@ -140,12 +227,13 @@ script:
   #──────────────────────────────────────────────────────────────
   - id: update_dynamic_setpoints
     then:
-      # Recompute the four ramp dynamic setpoints
       - component.update: ramp_temp_setpoint_dynamic
       - component.update: ramp_dwpt_setpoint_dynamic
       - component.update: ramp_fan_speed_setpoint_dynamic
       - component.update: ramp_fan_modulation_setpoint_dynamic
-      # Also update circulation fan command if in Ramp
-      - script.execute: update_circulation_fan
-      # Finally republish whichever setpoints correspond to the current mode
-      - script.execute: publish_mode_setpoints
+      - if:
+          condition:
+            lambda: 'return id(mode).state == "Ramp";'
+          then:
+            - script.execute: publish_mode_setpoints
+            - script.execute: activate_setpoints
