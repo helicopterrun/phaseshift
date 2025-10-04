@@ -1,25 +1,70 @@
-# sensors.yaml
+# =============================================================================
+# SENSORS.YAML - Environmental Monitoring & Control Algorithms
+# =============================================================================
+# Purpose:
+#   - Reads physical sensors (SHT3xd, BME280, TMP117, ADS1115)
+#   - Calculates derived values (dewpoint, VPD, RH target)
+#   - Implements dynamic setpoint interpolation during Ramp phase
+#   - Provides automatic fan control algorithms
+#   - Manages phase timing and elapsed time tracking
+#
+# Dependencies:
+#   - hardware_tmp117.yaml: cold_temp, hot_temp sensors
+#   - climate.yaml: PID controller result sensors
+#   - timing.yaml: sntp_time for timestamps
+#   - controls.yaml: setpoint numbers, mode select
+#
+# Key Algorithms:
+#   - Ramp Interpolation: Linear interpolation between start/end setpoints
+#   - Cold Fan Control: Balances dewpoint and drybulb PID outputs
+#   - Cold Heatsink Target: Dynamic TEC setpoint based on PID actions
+#   - Drying Force: Adaptive cooling intensity based on dewpoint error
+#
+# Notes:
+#   - All temperatures internally in Celsius
+#   - Update intervals tuned to sensor/process thermal dynamics
+#   - EMAs smooth noisy readings for stable control
+# =============================================================================
 
 sensor:
 
-  #──────────────────────────────────────────────────────────────
-  # 1) RAMP-STAGE DYNAMIC SETPOINTS
-  #──────────────────────────────────────────────────────────────
+  # ===========================================================================
+  # SECTION 1: RAMP PHASE DYNAMIC SETPOINTS
+  # ===========================================================================
+  # These sensors calculate linearly-interpolated setpoints during the Ramp
+  # phase based on elapsed time. They use the formula:
+  #   value = start + (end - start) * (elapsed / duration)
+  #
+  # The setpoints include:
+  #   - Temperature (drybulb)
+  #   - Dewpoint (humidity control)
+  #   - Fan speed (circulation)
+  #   - Fan modulation (duty cycle in seconds per minute)
+  # ===========================================================================
+
   - platform: template
     name: "Ramp Temperature Setpoint"
     id: ramp_temp_setpoint_dynamic
-    unit_of_measurement: "${temp_unit}"
+    unit_of_measurement: ${temp_unit}
     accuracy_decimals: 2
-    update_interval: never
+    update_interval: never  # Event-driven via script triggers
     lambda: |-
+      // Linear interpolation: start + (end - start) * progress
       float elapsed = id(ramp_days).state;
       float start   = id(ramp_start_temp).state;
       float end     = id(ramp_end_temp).state;
-      float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0f)      return start;
-      else if (elapsed >= dur)  return end;
-      float slope = (end - start) / dur;
-      return start + slope * elapsed;
+      float dur     = id(ramp_duration_s).state;
+      
+      // Guard against invalid inputs
+      if (isnan(elapsed) || isnan(dur) || dur <= 0.0f) {
+        return start;  // Default to start if calculation impossible
+      }
+      
+      // Clamp to start/end boundaries
+      if (elapsed <= 0.0f) return start;
+      if (elapsed >= dur)  return end;
+      
+      return start + (end - start) * elapsed / dur;
     on_value:
       then:
         - if:
@@ -31,18 +76,20 @@ sensor:
   - platform: template
     name: "Ramp Dewpoint Setpoint"
     id: ramp_dwpt_setpoint_dynamic
-    unit_of_measurement: "${temp_unit}"
+    unit_of_measurement: ${temp_unit}
     accuracy_decimals: 2
-    update_interval: never
+    update_interval: never  # Event-driven via script triggers
     lambda: |-
       float elapsed = id(ramp_days).state;
       float start   = id(ramp_start_dewpoint).state;
       float end     = id(ramp_end_dewpoint).state;
-      float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0f)      return start;
-      else if (elapsed >= dur)  return end;
-      float slope = (end - start) / dur;
-      return start + slope * elapsed;
+      float dur     = id(ramp_duration_s).state;
+      
+      if (isnan(elapsed) || isnan(dur) || dur <= 0.0f) return start;
+      if (elapsed <= 0.0f) return start;
+      if (elapsed >= dur)  return end;
+      
+      return start + (end - start) * elapsed / dur;
     on_value:
       then:
         - if:
@@ -56,67 +103,125 @@ sensor:
     id: ramp_fan_speed_setpoint_dynamic
     unit_of_measurement: "%"
     accuracy_decimals: 0
-    update_interval: never
+    update_interval: never  # Event-driven via script triggers
     lambda: |-
       float elapsed = id(ramp_days).state;
-      float start   = atof("${ramp_start_fan_speed}");
-      float end     = atof("${ramp_end_fan_speed}");
-      float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0)      return start;
-      else if (elapsed >= dur) return end;
-      float slope = (end - start) / dur;
-      return start + slope * elapsed;
+      float start   = id(ramp_start_fan_speed).state;
+      float end     = id(ramp_end_fan_speed).state;
+      float dur     = id(ramp_duration_s).state;
+      
+      if (isnan(elapsed) || isnan(dur) || dur <= 0.0f) return start;
+      if (elapsed <= 0.0f) return start;
+      if (elapsed >= dur)  return end;
+      
+      return start + (end - start) * elapsed / dur;
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Ramp";'
+            then:
+              - script.execute: publish_mode_setpoints
 
   - platform: template
     name: "Ramp Fan Modulation Setpoint"
     id: ramp_fan_modulation_setpoint_dynamic
     unit_of_measurement: "sec/min"
     accuracy_decimals: 0
-    update_interval: never
+    update_interval: never  # Event-driven via script triggers
     lambda: |-
+      // Fan modulation = seconds per minute the fan runs
+      // Example: 30 sec/min = fan runs for 30s, off for 30s each minute
       float elapsed = id(ramp_days).state;
-      float start   = atof("${ramp_start_fan_modulation}");
-      float end     = atof("${ramp_end_fan_modulation}");
-      float dur     = id(ramp_duration).state;
-      if (elapsed <= 0.0)      return start;
-      else if (elapsed >= dur) return end;
-      float slope = (end - start) / dur;
-      return start + slope * elapsed;
+      float start   = id(ramp_start_fan_modulation).state;
+      float end     = id(ramp_end_fan_modulation).state;
+      float dur     = id(ramp_duration_s).state;
+      
+      if (isnan(elapsed) || isnan(dur) || dur <= 0.0f) return start;
+      if (elapsed <= 0.0f) return start;
+      if (elapsed >= dur)  return end;
+      
+      return start + (end - start) * elapsed / dur;
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Ramp";'
+            then:
+              - script.execute: publish_mode_setpoints
 
-  #──────────────────────────────────────────────────────────────
-  # 2) CIRCUIT-LOGIC SENSORS (fan command, RH, VPD, elapsed time)
-  #──────────────────────────────────────────────────────────────
+  # ===========================================================================
+  # SECTION 2: CIRCULATION FAN CONTROL
+  # ===========================================================================
+  # Controls the chamber circulation fan with duty cycle modulation.
+  # 
+  # Behavior:
+  #   - During heating: runs continuously at set speed
+  #   - Otherwise: uses duty cycle (X seconds per minute)
+  #   - Speed and duty cycle vary by phase (Ramp/Plateau/Hold)
+  #
+  # Duty Cycle Example:
+  #   If duty = 30 sec/min and speed = 50%:
+  #   - Seconds 0-29: Fan at 50%
+  #   - Seconds 30-59: Fan at 0%
+  # ===========================================================================
+
   - platform: template
     name: "Circulation Fan Commanded Speed"
     id: circ_fan_command
     unit_of_measurement: "%"
-    accuracy_decimals: 0
-    update_interval: 1s
+    accuracy_decimals: 1
+    update_interval: 1s  # Fast update for responsive duty cycling
     lambda: |-
+      // Get speed and duty cycle for current phase
       std::string m = id(mode).state;
-      float speed = 0.0, duty = 0.0;
+      float speed = 0.0f, duty = 0.0f;
+      
       if (m == "Ramp") {
         speed = id(ramp_fan_speed_setpoint_dynamic).state;
         duty  = id(ramp_fan_modulation_setpoint_dynamic).state;
       } else if (m == "Plateau") {
         speed = id(circ_speed_plateau).state;
         duty  = id(circ_duty_plateau).state;
-      } else {
+      } else {  // Hold
         speed = id(circ_speed_hold).state;
         duty  = id(circ_duty_hold).state;
       }
-      if (id(heat).state) return speed;
-      int second = id(sntp_time).now().timestamp % 60;
-      return (duty > 0 && second < duty) ? speed : 0.0;
+
+      // Override: when heater is on, run fan continuously
+      if (id(heat).state) {
+        return speed;
+      }
+
+      // If duty cycle is 0, fan is always off
+      if (duty <= 0.0f) {
+        return 0.0f;
+      }
+
+      // Implement duty cycle: on for first 'duty' seconds of each minute
+      int sec = id(sntp_time).now().timestamp % 60;
+      if (sec >= duty) {
+        return 0.0f;  // Fan off during remainder of minute
+      }
+      
+      return speed;  // Fan on during duty period
+
     filters:
-      - clamp:
-          min_value: 0
-          max_value: 100
+      - round: 0
+      - clamp: { min_value: 0, max_value: 100 }
+
     on_value:
       then:
         - output.set_level:
             id: fan_circ
             level: !lambda 'return id(circ_fan_command).state / 100.0;'
+
+  # ===========================================================================
+  # SECTION 3: CALCULATED ENVIRONMENTAL VALUES
+  # ===========================================================================
+  # Derives humidity-related values from temperature and RH measurements.
+  # These are used for control decisions and user monitoring.
+  # ===========================================================================
 
   - platform: template
     name: "RH Target"
@@ -127,11 +232,18 @@ sensor:
     state_class: measurement
     update_interval: 20s
     lambda: |-
-      float dew = id(dewpoint_celcius).state;
-      float dry = id(drybulb_celcius).state;
+      // Calculate target RH from dewpoint and drybulb setpoints
+      // Using Magnus-Tetens approximation for saturation vapor pressure
+      float dew = id(dewpoint_celsius).state;
+      float dry = id(drybulb_celsius).state;
+      
       if (isnan(dew) || isnan(dry)) return NAN;
+      
+      // es(T) = 0.6108 * exp(17.27 * T / (T + 237.3)) [kPa]
       float e_dew = 0.6108 * exp((17.27 * dew) / (dew + 237.3));
       float e_dry = 0.6108 * exp((17.27 * dry) / (dry + 237.3));
+      
+      // RH = (e_dewpoint / e_drybulb) * 100%
       return (e_dew / e_dry) * 100.0;
 
   - platform: template
@@ -142,20 +254,37 @@ sensor:
     state_class: measurement
     update_interval: 20s
     lambda: |-
-      float dew = id(dewpoint_celcius).state;
+      // Saturation vapor pressure at dewpoint = actual vapor pressure
+      float dew = id(dewpoint_celsius).state;
+      
       if (isnan(dew)) return NAN;
+      
+      // Convert from kPa to Pa (* 10) for standard units
       return 10.0 * (0.6108 * exp((17.27 * dew) / (dew + 237.3)));
+
+  # ===========================================================================
+  # SECTION 4: PHASE TIMING AND ELAPSED TIME
+  # ===========================================================================
+  # Tracks time spent in each phase and overall cycle progress.
+  # These sensors are event-driven (update_interval: never) and updated
+  # explicitly by scripts when timestamps change.
+  # ===========================================================================
 
   - platform: template
     name: "Elapsed Time Since Cycle Start"
     id: elapsed_days
     unit_of_measurement: "days"
-    accuracy_decimals: 2
-    update_interval: never
+    device_class: duration
+    accuracy_decimals: 4
+    update_interval: never  # Updated by scripts
     lambda: |-
       uint32_t now = id(sntp_time).now().timestamp;
-      if (id(cycle_start_timestamp) == 0 || now < id(cycle_start_timestamp))
+      
+      // Guard against uninitialized or invalid timestamps
+      if (id(cycle_start_timestamp) == 0 || now < id(cycle_start_timestamp)) {
         return 0.0;
+      }
+      
       return (now - id(cycle_start_timestamp)) / 86400.0;
 
   - platform: template
@@ -163,10 +292,11 @@ sensor:
     id: hold_days
     unit_of_measurement: "days"
     device_class: duration
-    accuracy_decimals: 2
-    update_interval: never
+    accuracy_decimals: 4
+    update_interval: never  # Updated by scripts
     lambda: |-
       if (id(hold_start_timestamp) == 0) return 0.0;
+      
       float elapsed = id(sntp_time).now().timestamp - id(hold_start_timestamp);
       return elapsed > 0 ? elapsed / 86400.0 : 0.0;
 
@@ -175,13 +305,16 @@ sensor:
     id: ramp_days
     unit_of_measurement: "days"
     device_class: duration
-    accuracy_decimals: 2
-    update_interval: never
+    accuracy_decimals: 4
+    update_interval: never  # Updated by scripts
     lambda: |-
       if (id(ramp_start_timestamp) == 0) return 0.0;
+      
+      // If in Ramp: use current time; otherwise use plateau start
       float end = (id(mode).state == "Ramp")
         ? id(sntp_time).now().timestamp
         : id(plateau_start_timestamp);
+      
       float elapsed = end - id(ramp_start_timestamp);
       return elapsed > 0 ? elapsed / 86400.0 : 0.0;
 
@@ -190,19 +323,52 @@ sensor:
     id: plateau_days
     unit_of_measurement: "days"
     device_class: duration
-    accuracy_decimals: 2
-    update_interval: never
+    accuracy_decimals: 4
+    update_interval: never  # Updated by scripts
     lambda: |-
       if (id(plateau_start_timestamp) == 0) return 0.0;
+      
+      // If in Plateau: use current time; otherwise use hold start
       float end = (id(mode).state == "Plateau")
         ? id(sntp_time).now().timestamp
         : id(hold_start_timestamp);
+      
       float elapsed = end - id(plateau_start_timestamp);
       return elapsed > 0 ? elapsed / 86400.0 : 0.0;
 
-  #──────────────────────────────────────────────────────────────
-  # 3) AUTOMATIC COLD/HOT FAN ALGORITHMS
-  #──────────────────────────────────────────────────────────────
+  # ===========================================================================
+  # SECTION 5: AUTOMATIC FAN CONTROL ALGORITHMS
+  # ===========================================================================
+  # Cold and hot-side fans are controlled automatically based on system state.
+  # These algorithms balance multiple objectives (temperature, humidity, TEC
+  # protection) using PID outputs and direct temperature measurements.
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # Cold Fan Speed Algorithm
+  # ---------------------------------------------------------------------------
+  # Purpose: Remove moisture AND cool chamber air
+  # 
+  # Approach: Run fan at the HIGHER of two speeds:
+  #   1. dew_speed: Driven by dewpoint PID (humidity removal)
+  #   2. dry_speed: Driven by drybulb PID (temperature cooling)
+  #
+  # Coefficients:
+  #   - 50.0 for dewpoint: Lower priority, prevent over-drying
+  #   - 100.0 for drybulb: Higher priority, ensure temperature control
+  #
+  # PID Outputs:
+  #   - dewpoint_cool_result: 0.0-1.0, need more dehumidification
+  #   - dewpoint_heat_result: 0.0-1.0, need more humidification
+  #   - drybulb_cool_result: 0.0-1.0, need more cooling
+  #   - drybulb_heat_result: 0.0-1.0, need more heating
+  #
+  # Mixing Logic:
+  #   - dew_speed = (cool - warm) * 50 = net dehumidification need
+  #   - dry_speed = (cool - warm) * 100 = net cooling need
+  #   - Use max() to prioritize whichever need is greater
+  # ---------------------------------------------------------------------------
+
   - platform: template
     name: "Cold Fan Speed"
     id: cold_fan_speed
@@ -210,58 +376,31 @@ sensor:
     unit_of_measurement: "%"
     accuracy_decimals: 0
     state_class: measurement
-    update_interval: 10s
+    update_interval: 1s  # Fast response for active control
     lambda: |-
-      float chamber   = id(chamber_temp).state;
-      float dew       = id(dewpoint).state;
-      float dry_set   = id(drybulb_celcius).state;
-      float dew_set   = id(dewpoint_celcius).state;
+      // Get all PID action values (0.0-1.0 scale)
+      float dry_actn = id(dewpoint_cool_result).state;   // Dehumidify
+      float wet_actn = id(dewpoint_heat_result).state;   // Humidify
+      float cool_act = id(drybulb_cool_result).state;    // Cool
+      float warm_act = id(drybulb_heat_result).state;    // Heat
 
-      if (isnan(chamber) || isnan(dew) || isnan(dry_set) || isnan(dew_set)) {
-        return 0.0;
-      }
+      // Calculate net dewpoint control speed (dehumidification priority)
+      // Coefficient 50.0 tuned to balance with temperature control
+      float dew_speed = (dry_actn - warm_act) * 50.0;
+      
+      // Calculate net drybulb control speed (temperature priority)
+      // Coefficient 100.0 provides full-range fan speed
+      float dry_speed = (cool_act - wet_actn) * 100.0;
 
-      float output = 0.0;
+      // Use whichever control action demands more fan speed
+      return max(dew_speed, dry_speed);
 
-      if (chamber <= dry_set) {
-        if (dew > dew_set) {
-          float dew_error = dew - dew_set;
-          float speed     = (dew_error / 3.0) * 50.0;
-          if (speed > 50.0) {
-            speed = 50.0;
-          }
-          if (chamber < dry_set - 1.0) {
-            output = 0.0;
-          } else {
-            output = speed;
-          }
-        }
-      } else {
-        float base_speed = id(drybulb_cool_result).state * 100.0;
-        if (dew > dew_set) {
-          float cold       = id(cold_temp).state;
-          float cold_set   = id(cold_hs_setpoint).state;
-          float dry_action = id(drybulb_cool_result).state;
-          if (!isnan(cold) && !isnan(cold_set) && cold > cold_set) {
-            float overshoot      = cold - cold_set;
-            float k              = 0.1;
-            float base_limit     = 1.0 - k * overshoot;
-            if (base_limit < 0.0) base_limit = 0.0;
-            float penalty_factor = 1.0 - (dry_action * 0.9);
-            if (penalty_factor < 0.1) penalty_factor = 0.1;
-            base_speed *= base_limit * penalty_factor;
-          }
-        }
-        output = base_speed;
-      }
-
-      return round(output);
     filters:
       - clamp:
-          min_value: 0
+          min_value: 1      # Minimum speed to ensure air movement
           max_value: 100
       - exponential_moving_average:
-          alpha: 0.3
+          alpha: 0.05       # Heavy smoothing (alpha=0.05) prevents oscillation
           send_every: 1
           send_first_at: 1
     on_value:
@@ -270,6 +409,22 @@ sensor:
             id: fan_cold
             level: !lambda 'return id(cold_fan_speed).state / 100.0;'
 
+  # ---------------------------------------------------------------------------
+  # Hot Fan Speed Algorithm
+  # ---------------------------------------------------------------------------
+  # Purpose: Prevent TEC hot-side overheating
+  #
+  # Approach: Simple proportional control based on heatsink temperature
+  #   - Below 20°C: Fan off (passive cooling sufficient)
+  #   - 20-23.9°C: Linear ramp 0-100%
+  #   - Above 23.9°C: Fan at 100%
+  #
+  # Thresholds chosen to:
+  #   - Prevent TEC damage (max spec usually 80-85°C)
+  #   - Maintain efficiency (TEC performance drops with ΔT)
+  #   - Minimize noise (fan off when not needed)
+  # ---------------------------------------------------------------------------
+
   - platform: template
     name: "Hot Fan Speed"
     id: hot_fan_speed
@@ -277,100 +432,188 @@ sensor:
     device_class: speed
     accuracy_decimals: 0
     state_class: measurement
-    update_interval: 10s
+    update_interval: 10s  # Slower update OK, hot side has thermal inertia
     lambda: |-
-      float cur = id(hot_temp).state;
-      float min = 20.0, max = 23.9;
-      if (isnan(cur)) return 0.0;
-      if (cur <= min) return 0.0;
-      if (cur >= max) return 100.0;
-      return (cur - min) / (max - min) * 100.0;
+      float hot = id(hot_temp).state;
+      const float MIN_TEMP = 20.0;   // Fan off threshold
+      const float MAX_TEMP = 23.9;   // Fan full speed threshold
+
+      if (hot <= MIN_TEMP) {
+        return 0.0;  // Passive cooling sufficient
+      } else if (hot >= MAX_TEMP) {
+        return 100.0;  // Maximum cooling needed
+      } else {
+        // Linear interpolation between min and max
+        return (hot - MIN_TEMP) / (MAX_TEMP - MIN_TEMP) * 100.0;
+      }
     filters:
       - clamp:
           min_value: 0
           max_value: 100
       - exponential_moving_average:
-          alpha: 0.3
+          alpha: 0.3        # Moderate smoothing for hot side
           send_every: 1
           send_first_at: 1
     on_value:
       then:
         - output.set_level:
             id: fan_hot
-            level: !lambda return id(hot_fan_speed).state / 100.0;
+            level: !lambda 'return id(hot_fan_speed).state / 100.0;'
 
-  #──────────────────────────────────────────────────────────────
-  # 4) COLD HEATSINK TARGET ALGORITHM
-  #──────────────────────────────────────────────────────────────
+  # ===========================================================================
+  # SECTION 6: COLD HEATSINK TARGET CALCULATION
+  # ===========================================================================
+  # Dynamically adjusts TEC target temperature based on control needs.
+  # This is the "brain" of the humidity control system.
+  #
+  # Algorithm Overview:
+  #   1. Start with dewpoint setpoint as baseline
+  #   2. Add warming force when humidification needed (warm PID action)
+  #   3. Subtract cooling force when dehumidification needed (cool PID action)
+  #   4. Apply exponential smoothing with asymmetric alpha
+  #      - Slower cooling (dn_alpha) to prevent icing
+  #      - Faster warming (up_alpha) for responsive humidity increase
+  #
+  # Forces:
+  #   - warming_force: How aggressively to warm when adding humidity
+  #   - cooling_force: How aggressively to cool when removing humidity
+  #     (adaptive based on dewpoint error via "Drying Force" sensor)
+  #
+  # Alpha Values:
+  #   - cold_hs_dn_alpha: Rate of cooling change (typically 0.02)
+  #   - cold_hs_up_alpha: Rate of warming change (typically 0.04)
+  #   - Asymmetric to prevent icing while allowing quick recovery
+  # ===========================================================================
+
   - platform: template
     name: "Cold Heatsink Target Calculation"
     id: cold_calc
-    accuracy_decimals: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 10s
     lambda: |-
-      float dp_error   = id(dewpoint_error).state;
-      float mid_point  = id(dewpoint_celcius).state;
-      float dry_act    = id(dewpoint_cool_result).state;
-      float hot_lim    = mid_point + id(cold_hs_up_range).state;
-      float cool_act   = id(drybulb_cool_result).state;
-      float bias       = id(bias_range).state;
-      float low_lim;
-      if (id(allow_below_freezing).state)
-        low_lim = mid_point + id(cold_hs_dn_range).state;
-      else
-        low_lim = max(mid_point + id(cold_hs_dn_range).state,
-                      id(frost_limit).state);
-      float range_dn = mid_point - low_lim;
-      float range_up = hot_lim - mid_point;
-      float temp = mid_point;
-      if (dp_error < -0.5) {
-        temp = mid_point - range_dn * dry_act;
-      } else if (dp_error <= 0.5) {
-        temp = mid_point - (range_dn * dry_act + bias * cool_act);
-      } else {
-        temp = mid_point + range_up * cool_act;
-      }
-      return max(low_lim, min(temp, hot_lim));
-    filters:
-      - round: 1
+      // Get all inputs
+      float dew_targ = id(dewpoint_celsius).state;        // Base setpoint
+      float cld_actn = id(dewpoint_cool_result).state;    // Cool action (0-1)
+      float wrm_actn = id(dewpoint_heat_result).state;    // Warm action (0-1)
+      float dn_force = id(cooling_force).state;           // Adaptive cooling
+      float up_force = id(warming_force).state;           // Fixed warming
+      float dn_alpha = id(cold_hs_dn_alpha).state;        // Cooling rate
+      float up_alpha = id(cold_hs_up_alpha).state;        // Warming rate
+      float pre_targ = id(cold_hs_setpoint).state;        // Previous target
+
+      // Calculate raw target before smoothing
+      // Lower temp = more dehumidification; higher temp = more humidification
+      float raw_targ = dew_targ + (up_force * wrm_actn) - (dn_force * cld_actn);
+
+      // Choose alpha: slower when cooling (prevent icing), faster when warming
+      float cl_alpha = (raw_targ > pre_targ) ? up_alpha : dn_alpha;
+
+      // Apply exponential smoothing: new = old + alpha * (target - old)
+      float new_targ = pre_targ + cl_alpha * (raw_targ - pre_targ);
+
+      return new_targ;
+
     on_value:
       then:
         - number.set:
             id: cold_hs_setpoint
             value: !lambda 'return id(cold_calc).state;'
-        - climate.control:
-            id: pid_cold
-            mode: COOL
-            target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
 
-  #──────────────────────────────────────────────────────────────
-  # 5) INTERNAL & PID TEMPLATE SENSORS
-  #──────────────────────────────────────────────────────────────
+  # ---------------------------------------------------------------------------
+  # Drying Force (Adaptive Cooling Intensity)
+  # ---------------------------------------------------------------------------
+  # Adjusts how aggressively the system cools based on dewpoint error.
+  # Larger errors = more aggressive cooling up to frost limit.
+  #
+  # Logic:
+  #   - Error < -1°C: Moderate cooling (half range to frost limit)
+  #   - Error >= -2°C: Aggressive cooling (full range to frost limit)
+  #   - Otherwise: Conservative cooling (fixed 1.0°C range)
+  #
+  # Purpose: Prevent over-cooling when close to target, but allow
+  # aggressive action when far from setpoint.
+  # ---------------------------------------------------------------------------
+
+  - platform: template
+    name: "Drying Force"
+    id: cooling_force
+    update_interval: 60s  # Slow update, this is a tuning parameter
+    lambda: |-
+      float dew_targ = id(dewpoint_celsius).state;
+      float dp_error = id(dewpoint_error).state;      // Positive = too humid
+      float frst_lim = id(frost_limit).state;         // Hard minimum temp
+
+      // Safety: if error is invalid, use conservative value
+      if (isnan(dp_error)) return 3.0;
+      
+      // Adaptive cooling intensity based on error magnitude
+      if (dp_error <= -1.0) {
+        // Large negative error (too dry): moderate cooling
+        return (dew_targ - frst_lim) / 2.0;
+      } else if (dp_error >= -2.0) {
+        // Extreme error: aggressive cooling up to frost limit
+        return dew_targ - frst_lim;
+      } else {
+        // Near setpoint: conservative cooling
+        return 1.0;
+      }
+    filters:
+      - exponential_moving_average:
+          alpha: 0.01       # Very slow changes to drying force
+          send_every: 1
+      - round: 1
+
+  # ===========================================================================
+  # SECTION 7: INTERNAL SETPOINT SENSORS
+  # ===========================================================================
+  # These sensors hold the current active setpoints in Celsius.
+  # They are published by the publish_mode_setpoints script and converted
+  # from Fahrenheit if necessary.
+  # ===========================================================================
+
   - platform: template
     name: "Drybulb Set Point"
-    id: drybulb_celcius
+    id: drybulb_celsius
     device_class: temperature
     unit_of_measurement: "°C"
     state_class: measurement
     filters:
       - round: 2
-    update_interval: never
+    update_interval: never  # Published by script
 
   - platform: template
     name: "Dewpoint Set Point"
-    id: dewpoint_celcius
+    id: dewpoint_celsius
     device_class: temperature
     unit_of_measurement: "°C"
     state_class: measurement
     filters:
       - round: 2
-    update_interval: never
+    update_interval: never  # Published by script
+
+  # ===========================================================================
+  # SECTION 8: PID CONTROLLER OUTPUT SENSORS
+  # ===========================================================================
+  # These expose the PID controller actions for monitoring and use in
+  # control algorithms. Values are 0.0-1.0 representing control effort.
+  # ===========================================================================
 
   - platform: pid
     climate_id: pid_dewpoint
     name: "Dewpoint Cool Result"
     id: dewpoint_cool_result
     type: COOL
+    filters:
+      - multiply: 0.01      # Convert 0-100 to 0.0-1.0
+
+  - platform: pid
+    climate_id: pid_dewpoint
+    name: "Dewpoint Heat Result"
+    id: dewpoint_heat_result
+    type: HEAT
     filters:
       - multiply: 0.01
 
@@ -382,19 +625,42 @@ sensor:
     filters:
       - multiply: 0.01
 
+  - platform: pid
+    climate_id: pid_drybulb
+    name: "Drybulb Heat Result"
+    id: drybulb_heat_result
+    type: HEAT
+    filters:
+      - multiply: 0.01
+
+  # ===========================================================================
+  # SECTION 9: ERROR CALCULATIONS
+  # ===========================================================================
+  # Current error values for each controlled variable.
+  # Positive error = actual > setpoint
+  # ===========================================================================
+
   - platform: template
     name: "Dewpoint Error"
     id: dewpoint_error
     update_interval: 10s
     lambda: |-
-      return id(dewpoint_celcius).state - id(dewpoint).state;
+      // Error = setpoint - actual (positive = need more cooling)
+      return id(dewpoint_celsius).state - id(dewpoint).state;
 
   - platform: template
     name: "Drybulb Error"
     id: drybulb_error
     update_interval: 10s
     lambda: |-
-      return id(drybulb_celcius).state - id(chamber_temp).state;
+      return id(drybulb_celsius).state - id(chamber_temp).state;
+
+  # ===========================================================================
+  # SECTION 10: TEC CURRENT MONITORING
+  # ===========================================================================
+  # Monitors total current draw from both TEC drivers.
+  # Used for safety checks and efficiency monitoring.
+  # ===========================================================================
 
   - platform: template
     name: "Driver Current"
@@ -404,17 +670,45 @@ sensor:
     accuracy_decimals: 2
     update_interval: 1s
     lambda: |-
-      return id(ipropi_a).state + id(ipropi_b).state;
+      float a = id(ipropi_a).state;
+      float b = id(ipropi_b).state;
+      
+      // Validate sensor readings
+      if (isnan(a) || isnan(b)) {
+        ESP_LOGW("tec_current", "Current sensor returned NaN");
+        return 0.0;
+      }
+      
+      // Check for impossible values
+      if (a < 0.0 || b < 0.0) {
+        ESP_LOGW("tec_current", "Negative current detected: A=%.2f, B=%.2f", a, b);
+        return 0.0;
+      }
+      
+      return a + b;
+    filters:
+      - clamp:
+          min_value: 0.0
+      - round: 2
+
+  # ===========================================================================
+  # SECTION 11: VAPOR PRESSURE CALCULATIONS
+  # ===========================================================================
+  # Calculates saturated and actual vapor pressure for VPD monitoring.
+  # Uses Magnus-Tetens approximation for saturation vapor pressure.
+  # ===========================================================================
 
   - platform: template
     name: "Saturated Vapor Pressure"
     id: saturated_vapor_pressure
     unit_of_measurement: "kPa"
     accuracy_decimals: 3
-    update_interval: 18s
+    update_interval: 30s
     lambda: |-
       float t = id(chamber_temp).state;
       if (isnan(t)) return NAN;
+      
+      // Magnus-Tetens: es = 0.6108 * exp(17.27*T / (T+237.3)) [kPa]
       return 0.6108 * exp((17.27 * t) / (t + 237.3));
 
   - platform: template
@@ -422,197 +716,30 @@ sensor:
     id: actual_vapor_pressure
     unit_of_measurement: "kPa"
     accuracy_decimals: 3
-    update_interval: 20s
+    update_interval: 5s  # Faster update for active monitoring
     lambda: |-
       float t = id(chamber_temp).state;
       float h = id(chamber_rh).state;
+      
       if (isnan(t) || isnan(h)) return NAN;
-      float es = 0.6108 * exp((17.27 * t) / (t + 237.3));
-      return es * (h / 100.0);
-
-  - platform: template
-    name: "Dew Point"
-    id: dewpoint
-    unit_of_measurement: "°C"
-    device_class: temperature
-    state_class: measurement
-    update_interval: 20s
-    lambda: |-
-      float ea = id(actual_vapor_pressure).state;
-      float log_div = log(ea / 0.6108);
-      return (237.3 * log_div) / (17.27 - log_div);
-
-  - platform: template
-    name: "Icing Detector"
-    id: icing_detector
-    update_interval: 20s
-    lambda: |-
-      if (id(cold_temp).state < 1.0 && id(tec_pl_number).state > 0.8)
-        return 1.0;
-      return 0.0;
-    on_value_range:
-      - above: 0.5
-        then:
-          - script.execute: defrost_cycle
-
-  #──────────────────────────────────────────────────────────────
-  # 6) RAW HARDWARE SENSORS
-  #──────────────────────────────────────────────────────────────
-  - platform: sht3xd
-    temperature:
-      name: "Probe Temperature"
-      id: chamber_temp
-      accuracy_decimals: 2
-      filters:
-        - round: 2
-    humidity:
-      name: "Probe Humidity"
-      id: chamber_rh
-      accuracy_decimals: 2
-      filters:
-        - round: 2
-    address: 0x44
-    update_interval: 15s
-
-  - platform: bme280_i2c
-    address: 0x76
-    iir_filter: 16x
-    temperature:
-      name: "Ambient Temperature"
-      id: amb_temp
-    pressure:
-      name: "Ambient Pressure"
-    humidity:
-      name: "Ambient Humidity"
-    update_interval: 120s
-
-  - platform: ads1115
-    multiplexer: 'A0_GND'
-    gain: 6.144
-    id: ipropi_a
-    update_interval: 30s
+      
+      // Constants for Magnus formula (alternate formulation)
+      const float ALPHA = 6.112;     // hPa
+      const float BETA = 17.62;
+      const float LAMBDA = 243.12;
+      
+      // Saturation vapor pressure at chamber temp
+      float ew = ALPHA * exp((BETA * t) / (t + LAMBDA));
+      
+      // Actual vapor pressure = saturation * (RH / 100)
+      float e = ew * (h / 100.0);  // in hPa
+      
+      return e / 10.0;  // Convert hPa to kPa
     filters:
-      - lambda: |-
-          return x / 0.6825;
+      - round: 3
 
-  - platform: ads1115
-    multiplexer: 'A1_GND'
-    gain: 6.144
-    id: ipropi_b
-    update_interval: 30s
-    filters:
-      - lambda: |-
-          return x / 0.6825;
-
-  - platform: ads1115
-    multiplexer: 'A2_GND'
-    gain: 4.096
-    id: vref_a_in
-    update_interval: 120s
-
-  - platform: ads1115
-    multiplexer: 'A3_GND'
-    gain: 4.096
-    id: vref_b_in
-    update_interval: 120s
-
-  - platform: pulse_counter
-    pin:
-      number: 34
-      mode:
-        input: true
-    name: "Hot Fan RPM"
-    id: rpm_hot
-    unit_of_measurement: "RPM"
-    accuracy_decimals: 0
-    count_mode:
-      rising_edge: INCREMENT
-      falling_edge: DISABLE
-    filters:
-      - multiply: 0.5
-      - round: 2
-    update_interval: 5s
-
-  - platform: pulse_counter
-    pin:
-      number: 16
-      mode:
-        input: true
-    name: "Cold Fan RPM"
-    id: rpm_cold
-    unit_of_measurement: "RPM"
-    accuracy_decimals: 0
-    count_mode:
-      rising_edge: INCREMENT
-      falling_edge: DISABLE
-    filters:
-      - multiply: 0.5
-      - round: 2
-    update_interval: 5s
-
-  - platform: pulse_counter
-    pin:
-      number: 35
-      mode:
-        input: true
-    name: "Circulation Fan RPM"
-    id: rpm_circ
-    unit_of_measurement: "RPM"
-    accuracy_decimals: 0
-    count_mode:
-      rising_edge: INCREMENT
-      falling_edge: DISABLE
-    filters:
-      - multiply: 0.5
-      - round: 2
-    update_interval: 5s
-
-binary_sensor:
-  - platform: template
-    id: sponge_dry
-    name: "Add Water"
-    device_class: problem
-    lambda: |-
-      return (id(dewpoint_error).state > 1.0);
-
-text_sensor:
-  - platform: template
-    name: "Estimated Cycle Completion"
-    id: cycle_complete
-    icon: "mdi:calendar-end"
-    lambda: |-
-      if (id(cycle_start_timestamp) == 0) {
-        return std::string("");
-      }
-
-      float ramp_days = id(ramp_duration).state;
-      float plateau_days = id(plateau_duration).state;
-      time_t start = id(cycle_start_timestamp);
-      time_t end = start + (uint32_t)((ramp_days + plateau_days) * 86400);
-
-      char buffer[64];
-      strftime(buffer, sizeof(buffer), "%B %e, %Y at %I:%M %p", localtime(&end));
-      return std::string(buffer);
-
-  - platform: template
-    name: "Total Time Elapsed"
-    id: total_time_formatted
-    icon: "mdi:clock-outline"
-    lambda: |-
-      if (id(cycle_start_timestamp) == 0) {
-        return std::string("00d 00h 00m");
-      }
-
-      time_t now = id(sntp_time).now().timestamp;
-      if (now < id(cycle_start_timestamp)) {
-        return std::string("00d 00h 00m");
-      }
-
-      uint32_t elapsed = now - id(cycle_start_timestamp);
-      int days = elapsed / 86400;
-      int hours = (elapsed % 86400) / 3600;
-      int minutes = (elapsed % 3600) / 60;
-
-      char buffer[32];
-      snprintf(buffer, sizeof(buffer), "%02dd %02dh %02dm", days, hours, minutes);
-      return std::string(buffer);
+  # ===========================================================================
+  # SECTION 12: DEWPOINT CALCULATION
+  # ===========================================================================
+  # Calculates actual chamber dewpoint from temperature and RH.
+  # This is the primary controlle
