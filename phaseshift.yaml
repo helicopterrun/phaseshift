@@ -1,6 +1,6 @@
 # phaseshift.yaml
 # PhaseShift Open Environmental Control
-# Version: 2025.06.29.1
+# Version: 2025.06.26.4
 # Developer: @helicopterrun
 
 substitutions:
@@ -10,27 +10,27 @@ substitutions:
   temp_unit: "°F"
   default_max_current: "3.5"
 
-  ramp_duration: "8"
-  plateau_duration: "4"
+  ramp_duration: "5"
+  plateau_duration: "5"
 
-  ramp_start_dewpoint: "56.0"
-  ramp_end_dewpoint: "52.0"
+  ramp_start_dewpoint: "58.0"
+  ramp_end_dewpoint: "51.5"
   ramp_start_temp: "68.0"
-  ramp_end_temp: "68.0"
+  ramp_end_temp: "65.0"
   ramp_start_fan_speed: "100"
-  ramp_end_fan_speed: "10"
+  ramp_end_fan_speed: "40"
   ramp_start_fan_modulation: "100"
-  ramp_end_fan_modulation: "10"
+  ramp_end_fan_modulation: "30"
 
-  plateau_dewpoint: "52.0"
-  plateau_temp: "68.0"
+  plateau_dewpoint: "51.7"
+  plateau_temp: "65.0"
   plateau_fan_speed: "10"
-  plateau_fan_modulation: "10"
+  plateau_fan_modulation: "30"
 
-  hold_dewpoint: "54.0"
-  hold_temp: "68.0"
+  hold_dewpoint: "52.0"
+  hold_temp: "65.0"
   hold_fan_speed: "10"
-  hold_fan_modulation: "10"
+  hold_fan_modulation: "30"
 
   # Networking (optional static IP)
   static_ip: "192.168.50.224"
@@ -73,7 +73,7 @@ substitutions:
   timezone: "America/Los_Angeles"
 
 packages:
-  hardware:  !include packages/hardware_dallas.yaml
+  hardware:  !include packages/hardware_tmp117.yaml
   controls:  !include packages/controls.yaml
   sensors:  !include packages/sensors.yaml
   climate:   !include packages/climate.yaml
@@ -99,26 +99,34 @@ esp32:
 # Wi-Fi, Logging, API & OTA
 # —————————————————————————————————————————————————
 wifi:
-  # Set up a wifi access point
-  ap:
-    password: "phaseshift"
-
-captive_portal:
-
-esp32_improv:
-  authorizer: none
-
-dashboard_import:
-  package_import_url: helicopterrun/phaseshift/phaseshift.yaml@2025.06.29.1⁩
-  packages: !git "https://github.com/helicopterrun/phaseshift.git@main"
-  import_full_config: false # or true
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  manual_ip:
+    static_ip: 192.168.50.224
+    gateway: 192.168.50.1
+    subnet: 255.255.255.0
 
 logger:
+  level: DEBUG
+  logs: 
+    template.sensor: WARN
+    gpio.output: WARN
+    template.number: WARN
+    ledc.output: WARN
+    switch.gpio: WARN
+    tmp117: INFO
+    sht3xd: INFO
+    text_sensor: NONE
+    bme280.sensor: NONE
+    ads1115.sensor: INFO
 
 api:
-
+  encryption:
+    key: !secret ss2_api
 ota:
   - platform: esphome
+    password: !secret ss2_ota
 
 globals:
   - id: cycle_start_timestamp
@@ -141,3 +149,15 @@ globals:
     type: std::string
     restore_value: true
     initial_value: '"Hold"'
+  - id: ramp_elapsed
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
+  - id: plateau_elapsed
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
+  - id: hold_elapsed
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
