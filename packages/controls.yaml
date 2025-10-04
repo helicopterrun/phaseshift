@@ -472,20 +472,3 @@ button:
         - logger.log:
             format: "Cycle restarted at UNIX time: %u"
             args: [ 'id(cycle_start_timestamp)' ]
-  switch:
-  - platform: template
-    id: auto_advance_enabled
-    name: "Auto-Advance Phases"
-    icon: "mdi:skip-next-circle"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-      then:
-        - logger.log:
-            format: "Auto-advance ENABLED"
-            level: INFO
-    on_turn_off:
-      then:
-        - logger.log:
-            format: "Auto-advance DISABLED"
-            level: INFO
