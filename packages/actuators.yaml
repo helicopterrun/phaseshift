@@ -136,3 +136,20 @@ switch:
     name: "Allow Coil Below Freezing"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
+ 
+  - platform: template
+    id: auto_advance_enabled
+    name: "Auto-Advance Phases"
+    icon: "mdi:skip-next-circle"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - logger.log:
+            format: "Auto-advance ENABLED"
+            level: INFO
+    on_turn_off:
+      then:
+        - logger.log:
+            format: "Auto-advance DISABLED"
+            level: INFO
