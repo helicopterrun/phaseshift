@@ -1,0 +1,713 @@
+# controls.yaml
+
+number:
+  #—————————————————————————————————————
+  # Primary target setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Drybulb Target"
+    id: drybulb_setpoint
+    icon: mdi:thermometer
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_temp}
+    unit_of_measurement: "${temp_unit}"
+    min_value: -100
+    max_value: 100
+    step: 0.1
+
+  - platform: template
+    name: "Dewpoint Target"
+    id: dewpoint_setpoint
+    icon: mdi:weather-fog
+    optimistic: true
+    restore_value: true
+    initial_value: ${hold_dewpoint}
+    unit_of_measurement: "${temp_unit}"
+    min_value: -100
+    max_value: 100
+    step: 0.1
+
+  #—————————————————————————————————————
+  # Hardware driver numbers (internal)
+  #—————————————————————————————————————
+  - platform: template
+    name: "Max TEC Current"
+    id: pwm_max_current_number
+    optimistic: true
+    restore_value: true
+    initial_value: ${default_max_current}
+    unit_of_measurement: "A"
+    min_value: 0.0
+    max_value: 8.0
+    step: 0.1
+
+  - platform: template
+    name: "Driver Output Level"
+    id: tec_pl_number
+    optimistic: true
+    initial_value: 0.0
+    min_value: 0.0
+    max_value: 1.0
+    step: 0.01
+
+  #—————————————————————————————————————
+  # Duration controls for each phase
+  #—————————————————————————————————————
+  - platform: template
+    name: "Ramp Duration"
+    id: ramp_duration
+    icon: mdi:calendar-clock
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_duration}
+    min_value: 0
+    max_value: 256
+    step: 1
+    on_value:
+      then:
+        - component.update:
+            id: ramp_duration_s
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Plateau Duration"
+    id: plateau_duration
+    icon: mdi:calendar-clock
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_duration}
+    min_value: 0
+    max_value: 256
+    step: 1
+    on_value:
+      then:
+        - component.update:
+            id: plateau_duration_s
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp Duration Hours"
+    id: ramp_duration_hours
+    icon: "mdi:clock-outline"
+    optimistic: true
+    restore_value: true
+    initial_value: "0"
+    min_value: 0
+    max_value: 23
+    step: 1
+    on_value:
+      then:
+        - component.update:
+            id: ramp_duration_s
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Plateau Duration Hours"
+    id: plateau_duration_hours
+    icon: "mdi:clock-outline"
+    optimistic: true
+    restore_value: true
+    initial_value: "0"
+    min_value: 0
+    max_value: 23
+    step: 1
+    on_value:
+      then:
+        - component.update:
+            id: plateau_duration_s
+        - script.execute: update_dynamic_setpoints
+
+  #—————————————————————————————————————
+  # Ramp-stage dynamic setpoint overrides
+  #—————————————————————————————————————
+  - platform: template
+    name: "Ramp Start Dewpoint"
+    id: ramp_start_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_dewpoint}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp End Dewpoint"
+    id: ramp_end_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_end_dewpoint}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp Start Temperature"
+    id: ramp_start_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_temp}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:thermometer
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp End Temperature"
+    id: ramp_end_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_end_temp}
+    min_value: 0
+    max_value: 100
+    step: 0.1
+    icon: mdi:thermometer
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp Start Fan Speed"
+    id: ramp_start_fan_speed
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp End Fan Speed"
+    id: ramp_end_fan_speed
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_end_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp Start Fan Modulation"
+    id: ramp_start_fan_modulation
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp End Fan Modulation"
+    id: ramp_end_fan_modulation
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_end_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  #—————————————————————————————————————
+  # Plateau static setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Plateau Temperature"
+    id: plateau_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_temp}
+    min_value: 0
+    max_value: 100
+    step: 0.1
+    icon: mdi:thermometer
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Plateau";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: activate_setpoints
+
+  - platform: template
+    name: "Plateau Dewpoint"
+    id: plateau_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_dewpoint}
+    min_value: 0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Plateau";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: activate_setpoints
+
+  - platform: template
+    name: "Plateau Circulation Fan Speed"
+    id: circ_speed_plateau
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Plateau";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: update_circulation_fan
+
+  - platform: template
+    name: "Plateau Circulation Duty (sec/min)"
+    id: circ_duty_plateau
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Plateau";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: update_circulation_fan
+
+  #—————————————————————————————————————
+  # Hold static setpoints
+  #—————————————————————————————————————
+  - platform: template
+    name: "Hold Temperature"
+    id: hold_temp
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${hold_temp}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:thermometer
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Hold";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: activate_setpoints
+
+  - platform: template
+    name: "Hold Dewpoint"
+    id: hold_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${hold_dewpoint}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Hold";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: activate_setpoints
+
+  - platform: template
+    name: "Hold Circulation Fan Speed"
+    id: circ_speed_hold
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    initial_value: ${hold_fan_speed}
+    min_value: 0
+    max_value: 100
+    step: 1
+    icon: mdi:fan
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Hold";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: update_circulation_fan
+
+  - platform: template
+    name: "Hold Circulation Duty (sec/min)"
+    id: circ_duty_hold
+    unit_of_measurement: "sec/min"
+    optimistic: true
+    restore_value: true
+    initial_value: ${hold_fan_modulation}
+    min_value: 0
+    max_value: 60
+    step: 1
+    icon: mdi:timer
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode).state == "Hold";'
+            then:
+              - script.execute: publish_mode_setpoints
+              - script.execute: update_circulation_fan
+
+  #───────────────────────────────────────────
+  # Cold Heatsink Setpoint (for defrost & PID override)
+  #───────────────────────────────────────────
+  - platform: template
+    name: "Cold Heatsink Setpoint"
+    id: cold_hs_setpoint
+    unit_of_measurement: "°C"
+    optimistic: true
+    restore_value: True
+    initial_value: 11.11
+    min_value: -15.0
+    max_value: 100.0
+    step: 0.01
+    icon: mdi:coolant-temperature
+    on_value:
+      then:
+        - climate.control:
+            id: pid_cold
+            mode: COOL
+            target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
+
+  #—————————————————————————————————————
+  # Cold‐side heatsink ranges
+  #—————————————————————————————————————
+  - platform: template
+    name: "Heatsink Heating Range"
+    id: cold_hs_up_range
+    optimistic: true
+    restore_value: true
+    initial_value: 1.5
+    min_value: 0.0
+    max_value: 10.0
+    step: 0.1
+    icon: mdi:arrow-up-bold
+
+  - platform: template
+    name: "Heatsink Cooling Range"
+    id: cold_hs_dn_range
+    optimistic: true
+    restore_value: true
+    initial_value: -10.0
+    min_value: -15.0
+    max_value: 0.0
+    step: 0.5
+    icon: mdi:arrow-down-bold
+
+  - platform: template
+    name: "Heatsink Cooling Alpha"
+    id: cold_hs_dn_alpha
+    optimistic: true
+    restore_value: true
+    initial_value: 0.02
+    min_value: 0.0
+    max_value: 0.25
+    step: 0.01
+
+  - platform: template
+    name: "Heatsink Heating Alpha"
+    id: cold_hs_up_alpha
+    optimistic: true
+    restore_value: true
+    initial_value: 0.04
+    min_value: 0.0
+    max_value: 0.25
+    step: 0.01
+
+  - platform: template
+    name: "Heatsink Deadband"
+    id: cold_hs_deadband
+    optimistic: true
+    restore_value: true
+    initial_value: 0.1
+    min_value: 0
+    max_value: 10.0
+    step: 0.01
+    icon: mdi:arrow-down-bold
+
+  - platform: template
+    name: "Wetting Force"
+    id: warming_force
+    optimistic: true
+    restore_value: true
+    initial_value: 1.5
+    min_value: 0
+    max_value: 10.0
+    step: 0.1
+    icon: mdi:arrow-down-bold
+
+  #—————————————————————————————————————
+  # Bias Temperature # Authority of drybulb on cold side temp when near dewpoint target. (default: 2°C)
+  #—————————————————————————————————————
+  - platform: template
+    name: Heatsink Bias
+    id: bias_range
+    optimistic: true
+    restore_value: true
+    initial_value: 2.0
+    min_value: -10.0
+    max_value: 10.0
+    step: 0.5
+
+  #—————————————————————————————————————
+  # Frost limit is the lowest temperature the system will target to prevent frost (default: 2.0°C)
+  #—————————————————————————————————————
+  - platform: template
+    name: Frost Limit
+    id: frost_limit
+    optimistic: true
+    restore_value: true
+    initial_value: 1.0
+    min_value: 0.0
+    max_value: 10.0
+    step: 0.5
+
+#—————————————————————————————————————
+# Phase selector
+#—————————————————————————————————————
+select:
+  - platform: template
+    name: "Mode"
+    id: mode
+    options: ["Ramp", "Plateau", "Hold"]
+    optimistic: true
+    restore_value: true
+
+#—————————————————————————————————————
+# Buttons for setpoint & driver control
+#—————————————————————————————————————
+button:
+  # Push all setpoints (Drybulb & Dewpoint) into the PID controllers
+  - platform: template
+    internal: True
+    id: submit_values
+    on_press:
+      then:
+        - sensor.template.publish:
+            id: drybulb_celcius
+            state: !lambda |-
+              float v = id(drybulb_setpoint).state;
+              if (${use_fahrenheit}) {
+                v = (v - 32.0) * 5.0 / 9.0;
+              }
+              return v;
+        - sensor.template.publish:
+            id: dewpoint_celcius
+            state: !lambda |-
+              float v = id(dewpoint_setpoint).state;
+              if (${use_fahrenheit}) {
+                v = (v - 32.0) * 5.0 / 9.0;
+              }
+              return v;
+        - climate.control:
+            id: pid_drybulb
+            mode: HEAT_COOL
+            target_temperature: !lambda 'return id(drybulb_celcius).state;'
+        - climate.control:
+            id: pid_dewpoint
+            mode: COOL
+            target_temperature: !lambda 'return id(dewpoint_celcius).state;'
+
+  # Apply the maximum current limit to the TEC drivers
+  - platform: template
+    internal: True
+    id: apply_current_settings
+    on_press:
+      then:
+        - output.set_level:
+            id: vref_a_out
+            level: !lambda 'return id(pwm_max_current_number).state * 0.7467 / 5.0;'
+        - output.set_level:
+            id: vref_b_out
+            level: !lambda 'return id(pwm_max_current_number).state * 0.7467 / 5.0;'
+
+  # Push the driver PWM level out to the TEC channels
+  - platform: template
+    internal: True
+    id: set_pwm
+    on_press:
+      then:
+        - output.set_level:
+            id: pwm_a
+            level: !lambda 'return id(tec_pl_number).state;'
+        - output.set_level:
+            id: pwm_b
+            level: !lambda 'return id(tec_pl_number).state;'
+
+  - platform: template
+    name: "Start New Cycle"
+    id: restart_cycle
+    icon: "mdi:restart"
+    on_press:
+      then:
+        # 1) Recompute all your dynamic setpoints immediately
+        - script.execute: update_dynamic_setpoints
+
+        # 2) Stamp every phase start & reset elapsed counters
+        - lambda: |-
+            time_t now = id(sntp_time).now().timestamp;
+
+            id(cycle_start_timestamp)   = now;
+            id(ramp_start_timestamp)    = now;
+            id(plateau_start_timestamp) = now;
+            id(hold_start_timestamp)    = now;
+
+            id(ramp_elapsed)     = 0;
+            id(plateau_elapsed)  = 0;
+            id(hold_elapsed)     = 0;
+
+        # 3) Force-update your elapsed sensors so HA shows 0 immediately
+        - script.execute: update_elapsed_times
+
+        # 4) Log for debug
+        - logger.log:
+            format: "Cycle restarted at %u (timestamps and elapsed timers reset)"
+            args: [ 'id(cycle_start_timestamp)' ]
+
+  - platform: template
+    name: "Activate Ramp Mode"
+    id: switch_to_ramp
+    icon: "mdi:trending-up"
+    on_press:
+      then:
+        # 1) Change the mode
+        - select.set:
+            id: mode
+            option: "Ramp"
+
+        # 2) Run your old set_action lambda to stamp timestamps
+        - lambda: |-
+            const uint32_t now  = id(sntp_time).now().timestamp;
+            const auto   prev = id(last_mode);
+            const auto   m    = id(mode).state;
+
+            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
+              id(cycle_start_timestamp) = now;
+            }
+
+            if (m != prev) {
+              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
+              else if (m == "Plateau") id(plateau_start_timestamp) = now;
+              else                      id(hold_start_timestamp)   = now;
+            }
+
+            id(last_mode) = m;
+
+        # 3) Publish new setpoints & refresh fan
+        - script.execute: publish_mode_setpoints
+        - script.execute: update_circulation_fan
+
+  - platform: template
+    name: "Activate Plateau Mode"
+    id: switch_to_plateau
+    icon: "mdi:trending-right"
+    on_press:
+      then:
+        - select.set:
+            id: mode
+            option: "Plateau"
+        - lambda: |-
+            const uint32_t now  = id(sntp_time).now().timestamp;
+            const auto   prev = id(last_mode);
+            const auto   m    = id(mode).state;
+
+            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
+              id(cycle_start_timestamp) = now;
+            }
+
+            if (m != prev) {
+              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
+              else if (m == "Plateau") id(plateau_start_timestamp) = now;
+              else                      id(hold_start_timestamp)   = now;
+            }
+
+            id(last_mode) = m;
+        - script.execute: publish_mode_setpoints
+        - script.execute: update_circulation_fan
+
+  - platform: template
+    name: "Activate Hold Mode"
+    id: switch_to_hold
+    icon: "mdi:timer-sand"
+    on_press:
+      then:
+        - select.set:
+            id: mode
+            option: "Hold"
+        - lambda: |-
+            const uint32_t now  = id(sntp_time).now().timestamp;
+            const auto   prev = id(last_mode);
+            const auto   m    = id(mode).state;
+
+            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
+              id(cycle_start_timestamp) = now;
+            }
+
+            if (m != prev) {
+              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
+              else if (m == "Plateau") id(plateau_start_timestamp) = now;
+              else                      id(hold_start_timestamp)   = now;
+            }
+
+            id(last_mode) = m;
+        - script.execute: publish_mode_setpoints
+        - script.execute: update_circulation_fan

@@ -1,0 +1,142 @@
+# actuators.yaml
+
+output:
+  # Heater Output (Sigma-Delta) → drives the heat switch
+  - platform: sigma_delta_output
+    update_interval: 5s
+    id: heater_output
+    max_power: 0.3 
+    turn_on_action:
+      then:
+        - switch.turn_on: heat
+    turn_off_action:
+      then:
+        - switch.turn_off: heat
+
+  # Dummy “output” for Dewpoint PID
+  - platform: template
+    id: dewpoint_pid_cool
+    type: float
+    write_action:
+      - logger.log:
+          format: "Dewpoint PID COOL"
+
+  # Dummy “output” for Dewpoint PID
+  - platform: template
+    id: dewpoint_pid_warm
+    type: float
+    write_action:
+      # you can log or route this into another output if you like
+      - logger.log:
+          format: "Dewpoint PID WARM"
+
+  # TEC output level (writes to PWM number then presses set_pwm)
+  - platform: template
+    id: tec_output
+    type: float
+    write_action:
+      - number.set:
+          id: tec_pl_number
+          value: !lambda 'return state;'
+      - button.press: set_pwm
+
+  # Cold‐fan compensated output (adjusts fan_cold level and publishes speed)
+  - platform: template
+    id: cold_fan_compensated_output
+    type: float
+    write_action:
+      - logger.log:
+          format: "Cold Fan PID"
+
+  # DAC outputs for TEC current limiting
+  - platform: mcp4728
+    id: vref_a_out
+    mcp4728_id: dac_output
+    channel: A
+    vref: vdd
+
+  - platform: mcp4728
+    id: vref_b_out
+    mcp4728_id: dac_output
+    channel: C
+    vref: vdd
+
+  - platform: mcp4728
+    id: imode_a
+    mcp4728_id: dac_output
+    channel: B
+    vref: internal
+    gain: X1
+
+  - platform: mcp4728
+    id: imode_b
+    mcp4728_id: dac_output
+    channel: D
+    vref: internal
+    gain: X1
+
+  # TEC driver control pins
+  - platform: gpio
+    id: nsleep_a
+    pin: ${nsleep_a_pin}
+
+  - platform: gpio
+    id: nsleep_b
+    pin: ${nsleep_b_pin}
+
+  - platform: gpio
+    id: p_mode
+    pin: ${p_mode_pin}
+
+  # PWM channels for TEC drivers
+  - platform: ledc
+    id: pwm_a
+    pin: ${pwm_tec_a_pin}
+    frequency: ${pwm_tec_freq}
+
+  - platform: ledc
+    id: pwm_b
+    pin: ${pwm_tec_b_pin}
+    frequency: ${pwm_tec_freq}
+
+  # PWM channels for fans
+  - platform: ledc
+    id: fan_hot
+    pin: ${pwm_fan_hot_pin}
+    frequency: ${pwm_fan_freq}
+
+  - platform: ledc
+    id: fan_cold
+    pin: ${pwm_fan_cold_pin}
+    frequency: ${pwm_fan_freq}
+
+  - platform: ledc
+    id: fan_circ
+    pin: ${pwm_fan_circ_pin}
+    frequency: ${pwm_fan_freq}
+
+switch:
+  # Chamber heater relay
+  - platform: gpio
+    id: heat
+    pin: ${heat_pin}
+    name: "Chamber Heat"
+    inverted: true
+
+  # Fahrenheit/Celsius toggle (compile-time substitution recommended)
+  - platform: template
+    id: use_fahrenheit
+    name: "Use Fahrenheit"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - button.press: submit_values
+    on_turn_off:
+      - button.press: submit_values
+
+  # Allow coil to drop below freezing toggle
+  - platform: template
+    id: allow_below_freezing
+    name: "Allow Coil Below Freezing"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF

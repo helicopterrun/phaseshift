@@ -1,0 +1,23 @@
+# timing.yaml
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "${timezone}"
+
+    # 1) Once SNTP syncs on boot, restore your phase & timers, then push setpoints
+    on_time_sync:
+      then:
+        - delay: 2s
+        - script.execute: restore_mode
+        - script.execute: update_elapsed_times
+#- script.execute: update_mode_from_elapsed
+        - script.execute: publish_mode_setpoints
+          
+interval:
+  - interval: 1s
+    then:
+      - script.execute: update_circulation_fan
+
+#  - interval: 60s
+#    then:
+#      - script.execute: update_mode_from_elapsed
