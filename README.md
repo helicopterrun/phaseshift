@@ -206,4 +206,206 @@ HOLD
 ![image](https://github.com/user-attachments/assets/888ac249-8401-4d0a-a034-2add6de52298)
 
 
+# Climate Control Chamber Performance Analysis Report
+
+**Data Period:** September 26-28, 2025  
+**Total Measurements:** 256,875  
+**Analysis Date:** October 5, 2025
+
+---
+
+## 🎯 Executive Summary
+
+**Overall System Rating: EXCELLENT ✅**
+
+All three control parameters achieve 100% accuracy within ±0.25°F tolerance, demonstrating exceptional temperature and humidity control performance across 48 hours of continuous operation.
+
+---
+
+## 📊 Performance Overview
+
+### 1. Cold Side Temperature Tracking
+**Target:** Dynamic setpoint (cold_heatsink_target_calculation)  
+**Rating:** EXCELLENT ⭐⭐⭐⭐⭐
+
+| Metric | Value |
+|--------|-------|
+| **Mean Tracking Error (Bias)** | 0.0000°F |
+| **Mean Absolute Error (MAE)** | 0.0067°F |
+| **Standard Deviation** | 0.0084°F |
+| **Maximum Error** | 0.0397°F |
+| **Minimum Error** | -0.0348°F |
+| **Error Range** | 0.0745°F |
+| **Matched Measurements** | 171,052 |
+
+**Tolerance Performance:**
+- ✅ Within ±0.25°F: **100.00%**
+- ✅ Within ±0.50°F: **100.00%**
+- ✅ Within ±1.00°F: **100.00%**
+
+**Error Distribution Percentiles:**
+- 50th percentile (median): 0.0056°F
+- 95th percentile: 0.0166°F
+- 99th percentile: 0.0220°F
+
+**Key Findings:**
+- Zero systematic bias - no temperature drift
+- Exceptional tracking accuracy (MAE < 0.01°F)
+- Perfect adherence to tight tolerance bands
+- Target setpoint ranged from 48.595°F to 49.430°F (0.835°F span)
+- System tracks dynamic setpoint changes with minimal lag
+
+---
+
+### 2. Dew Point Control
+**Target:** 54.0°F  
+**Rating:** EXCELLENT ⭐⭐⭐⭐⭐
+
+| Metric | Value |
+|--------|-------|
+| **Target Temperature** | 54.000°F |
+| **Actual Mean** | 53.996°F |
+| **Mean Absolute Error (MAE)** | 0.0226°F |
+| **Standard Deviation** | 0.0310°F |
+| **Bias** | -0.004°F |
+| **Temperature Range** | 53.878°F - 54.084°F |
+| **Range Span** | 0.206°F |
+| **Total Measurements** | 34,304 |
+
+**Tolerance Performance:**
+- ✅ Within ±0.25°F: **100.00%**
+- ✅ Within ±0.50°F: **100.00%**
+- ✅ Within ±1.00°F: **100.00%**
+
+**Key Findings:**
+- Minimal bias of -0.004°F (essentially zero)
+- Outstanding humidity control stability
+- Exceptionally tight precision (σ = 0.031°F)
+- Perfect tolerance compliance across all measurements
+
+---
+
+### 3. Probe Temperature Control
+**Target:** 68.0°F  
+**Rating:** EXCELLENT ⭐⭐⭐⭐⭐
+
+| Metric | Value |
+|--------|-------|
+| **Target Temperature** | 68.000°F |
+| **Actual Mean** | 68.000°F |
+| **Mean Absolute Error (MAE)** | 0.0077°F |
+| **Standard Deviation** | 0.0097°F |
+| **Bias** | 0.000°F |
+| **Temperature Range** | 67.956°F - 68.042°F |
+| **Range Span** | 0.087°F |
+| **Total Measurements** | 34,319 |
+
+**Tolerance Performance:**
+- ✅ Within ±0.25°F: **100.00%**
+- ✅ Within ±0.50°F: **100.00%**
+- ✅ Within ±1.00°F: **100.00%**
+
+**Key Findings:**
+- Perfect mean accuracy (zero bias)
+- Tightest control of all three parameters
+- Best-in-class precision (σ = 0.0097°F)
+- Minimal temperature variation (0.087°F total range)
+
+---
+
+## 📈 Comparative Analysis
+
+### Error Metrics Ranking (Best to Worst)
+
+**Mean Absolute Error:**
+1. Cold Side Tracking: 0.0067°F ⭐
+2. Probe Temperature: 0.0077°F
+3. Dew Point: 0.0226°F
+
+**Standard Deviation (Precision):**
+1. Cold Side Tracking: 0.0084°F ⭐
+2. Probe Temperature: 0.0097°F
+3. Dew Point: 0.0310°F
+
+**All parameters demonstrate excellent control well within engineering tolerances.**
+
+---
+
+## 🔬 Technical Methodology
+
+### Cold Side Temperature Analysis Approach
+
+The cold side temperature analysis was performed using a **time-synchronized matching algorithm**:
+
+1. **Data Preparation:**
+   - Sorted 171,052 cold_side_temperature measurements by timestamp
+   - Sorted 17,184 cold_heatsink_target_calculation measurements by timestamp
+
+2. **Matching Algorithm:**
+   - For each cold side measurement, identified the most recent target setpoint using last-value-carried-forward (LVCF) method
+   - This accounts for the ~10:1 ratio of temperature measurements to target updates
+
+3. **Error Calculation:**
+   - Tracking Error = Actual Cold Side Temperature - Target Setpoint
+   - Computed for each of 171,052 matched pairs
+
+4. **Statistical Analysis:**
+   - Mean error, MAE, standard deviation
+   - Percentile distribution
+   - Tolerance band compliance
+
+**Important Note:** This method provides the true tracking performance. A naive comparison to the mean target value would incorrectly suggest MAE = 0.145°F, which is **21.6× worse** than the actual performance of 0.0067°F.
+
+---
+
+## ✅ Conclusions
+
+### System Strengths
+1. **Exceptional Tracking Precision** - Cold side temperature follows dynamic setpoint with <0.01°F error
+2. **Zero Systematic Bias** - All parameters show negligible long-term drift
+3. **Perfect Tolerance Compliance** - 100% of measurements within ±0.25°F for all parameters
+4. **Robust Performance** - Consistent control maintained over 256,875 measurements across 48 hours
+5. **Multi-Parameter Excellence** - Simultaneous control of temperature and humidity at high precision
+
+### Performance Grade: A+ (Excellent)
+
+All control objectives have been met and exceeded:
+- ✅ Cold side temperature tracks dynamic target setpoint: **0.0067°F MAE**
+- ✅ Probe temperature maintained at 68.0°F: **0.0077°F MAE**
+- ✅ Dew point maintained at 54.0°F: **0.0226°F MAE**
+
+---
+
+## 📁 Data Summary
+
+| Parameter | Entity ID | Measurements |
+|-----------|-----------|--------------|
+| Cold Side Temperature | `sensor.phaseshift_1cda28_cold_side_temperature` | 171,052 |
+| Cold Heatsink Target | `sensor.phaseshift_1cda28_cold_heatsink_target_calculation` | 17,184 |
+| Probe Temperature | `sensor.phaseshift_1cda28_probe_temperature` | 34,319 |
+| Dew Point | `sensor.phaseshift_1cda28_dew_point` | 34,304 |
+
+**Time Range:** 2025-09-26 07:00:00 UTC to 2025-09-28 06:59:59 UTC (48 hours)
+
+---
+
+## 🛠️ Recommendations
+
+The system is performing exceptionally well. Consider the following for future optimization:
+
+1. **Documentation** - Record current control parameters/PID tuning for reference
+2. **Monitoring** - Implement automated alerts if MAE exceeds 0.05°F threshold
+3. **Long-term Analysis** - Track performance metrics over weeks/months to identify any degradation
+4. **Validation** - Periodically verify sensor calibration to maintain accuracy
+
+---
+
+**Analysis performed using:**
+- Data source: `history 1.csv`
+- Analysis tool: Time-series statistical analysis with timestamp matching
+- Total data points analyzed: 256,875
+
+*Report generated: October 2025*
+
+
 
