@@ -493,6 +493,17 @@ select:
     restore_value: true
 
 # ══════════════════════════════════════════════════════════════════════════
+# AUTOMATION TOGGLE - On-device timed phase advancement (manual tiles override)
+# ══════════════════════════════════════════════════════════════════════════
+switch:
+  - platform: template
+    name: "Auto-Advance Phases"
+    id: auto_advance
+    icon: "mdi:fast-forward-outline"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+# ══════════════════════════════════════════════════════════════════════════
 # CONTROL BUTTONS - System commands and setpoint activation
 # ══════════════════════════════════════════════════════════════════════════
 button:

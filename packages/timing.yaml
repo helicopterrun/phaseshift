@@ -4,15 +4,18 @@ time:
     id: sntp_time
     timezone: "${timezone}"
 
-    # 1) Once SNTP syncs on boot, restore your phase & timers, then push setpoints
+    # 1) Once SNTP syncs on boot: restore phase & timers, init durations, push
+    #    setpoints, then catch up advancement (handles a reboot mid-cycle).
     on_time_sync:
       then:
         - delay: 2s
         - script.execute: restore_mode
+        - component.update: ramp_duration_s
+        - component.update: plateau_duration_s
         - script.execute: update_elapsed_times
-#- script.execute: update_mode_from_elapsed
         - script.execute: publish_mode_setpoints
-          
+        - script.execute: update_mode_from_elapsed
+
 interval:
   - interval: 1s
     then:
@@ -23,6 +26,8 @@ interval:
     then:
       - script.execute: tec_safety_check
 
-#  - interval: 60s
-#    then:
-#      - script.execute: update_mode_from_elapsed
+  # Periodic elapsed-time refresh + timed phase advancement (gated by auto_advance)
+  - interval: 60s
+    then:
+      - script.execute: update_elapsed_times
+      - script.execute: update_mode_from_elapsed

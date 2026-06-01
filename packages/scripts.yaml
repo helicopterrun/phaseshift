@@ -29,19 +29,29 @@ script:
   # ══════════════════════════════════════════════════════════════════════════
   - id: update_mode_from_elapsed
     then:
+      # Gated by the Auto-Advance toggle; guarded against an unsynced clock and
+      # stale pre-SNTP start timestamps (1577836800 = 2020-01-01 UTC) so a 1970
+      # timestamp can't make elapsed huge and instantly skip a phase. NaN
+      # duration (uninitialised) also blocks advance (x >= NaN is false anyway).
       - if:
           condition:
             and:
+              - switch.is_on: auto_advance
+              - lambda: 'return id(sntp_time).now().is_valid();'
               - lambda: 'return id(mode).state == "Ramp";'
-              - lambda: 'return id(ramp_elapsed) >= id(ramp_duration_s).state;'
+              - lambda: 'return id(ramp_start_timestamp) > 1577836800;'
+              - lambda: 'return !isnan(id(ramp_duration_s).state) && id(ramp_elapsed) >= id(ramp_duration_s).state;'
           then:
             - button.press: switch_to_plateau
 
       - if:
           condition:
             and:
+              - switch.is_on: auto_advance
+              - lambda: 'return id(sntp_time).now().is_valid();'
               - lambda: 'return id(mode).state == "Plateau";'
-              - lambda: 'return id(plateau_elapsed) >= id(plateau_duration_s).state;'
+              - lambda: 'return id(plateau_start_timestamp) > 1577836800;'
+              - lambda: 'return !isnan(id(plateau_duration_s).state) && id(plateau_elapsed) >= id(plateau_duration_s).state;'
           then:
             - button.press: switch_to_hold
 
@@ -142,6 +152,13 @@ script:
   # ══════════════════════════════════════════════════════════════════════════
   - id: update_dynamic_setpoints
     then:
+      # Refresh the elapsed-days sensors FIRST — the ramp interpolation sensors
+      # below read id(ramp_days).state as their time base, and these are
+      # update_interval: never (driven only from here / the 60s interval).
+      - component.update: elapsed_days
+      - component.update: ramp_days
+      - component.update: plateau_days
+      - component.update: hold_days
       - component.update: ramp_temp_setpoint_dynamic
       - component.update: ramp_dwpt_setpoint_dynamic
       - component.update: ramp_fan_speed_setpoint_dynamic
