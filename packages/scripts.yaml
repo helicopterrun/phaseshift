@@ -82,11 +82,6 @@ script:
   # ══════════════════════════════════════════════════════════════════════════
   # Restore last phase and units on boot
   # ══════════════════════════════════════════════════════════════════════════
-  - id: return_to_default
-    then:
-      - script.execute: restore_mode
-      - script.execute: update_circulation_fan
-
   - id: restore_mode
     then:
       - select.set:
@@ -106,12 +101,14 @@ script:
   - id: defrost_cycle
     then:
       - logger.log: "Defrost cycle started"
+      - lambda: 'id(is_defrosting) = true;'  # suspend cold_calc writes (see globals)
       - climate.control:
           id: pid_cold
           mode: HEAT_COOL
           target_temperature: 5°C
       - delay: 5min
       - logger.log: "Defrost complete, resuming normal cooling"
+      - lambda: 'id(is_defrosting) = false;'
       - climate.control:
           id: pid_cold
           mode: COOL
@@ -191,3 +188,72 @@ script:
           option: !lambda 'return mode;'
       - script.execute: publish_mode_setpoints
       - script.execute: update_circulation_fan
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Hot-side TEC safety guard (run every 2s from timing.yaml).
+  # Tiers (thresholds = tec_hot_* substitutions):
+  #   WARN   (>= warn_on)   : flag + log only, clears < warn_off (5 °C hyst)
+  #   CUTOFF (>= cutoff_on) : force hot fan 100% + freeze TEC power at the
+  #                           current level, clears < cutoff_off (5 °C hyst)
+  #   FAULT  (>= fault)     : latch, disable TEC drive, manual reset required
+  #   SENSOR LOSS           : 3 consecutive NaN reads latch the same fault
+  # ══════════════════════════════════════════════════════════════════════════
+  - id: tec_safety_check
+    then:
+      - lambda: |-
+          float hot = id(hot_temp).state;
+
+          if (isnan(hot)) {
+            // Sensor loss: tolerate brief dropouts, latch after 3 in a row.
+            if (id(hot_nan_count) < 255) id(hot_nan_count) += 1;
+            if (id(hot_nan_count) >= 3 && !id(tec_fault_latched)) {
+              id(tec_fault_latched) = true;
+              ESP_LOGE("safety", "Hot-side sensor lost (%u consecutive NaN) - latching TEC fault",
+                       id(hot_nan_count));
+            }
+            return;
+          }
+          id(hot_nan_count) = 0;
+
+          // FAULT (latched) — highest priority.
+          if (hot >= ${tec_hot_fault} && !id(tec_fault_latched)) {
+            id(tec_fault_latched) = true;
+            ESP_LOGE("safety", "Hot side %.1f C >= %d C - latching TEC fault", hot, ${tec_hot_fault});
+          }
+
+          // CUTOFF (non-latched, 5 C hysteresis). Capture ceiling on trip.
+          if (!id(hot_cutoff_active) && hot >= ${tec_hot_cutoff_on}) {
+            id(hot_cutoff_active) = true;
+            id(tec_cutoff_ceiling) = id(tec_pl_number).state;
+            ESP_LOGW("safety", "Hot side %.1f C >= %d C - CUTOFF: fan high, TEC frozen at %.2f",
+                     hot, ${tec_hot_cutoff_on}, id(tec_cutoff_ceiling));
+          } else if (id(hot_cutoff_active) && hot < ${tec_hot_cutoff_off}) {
+            id(hot_cutoff_active) = false;
+            id(tec_cutoff_ceiling) = 1.0f;
+            ESP_LOGI("safety", "Hot side %.1f C < %d C - CUTOFF cleared", hot, ${tec_hot_cutoff_off});
+          }
+
+          // WARN (non-latched, log/flag only, 5 C hysteresis).
+          if (!id(hot_warn_active) && hot >= ${tec_hot_warn_on}) {
+            id(hot_warn_active) = true;
+            ESP_LOGW("safety", "Hot side %.1f C >= %d C - WARN", hot, ${tec_hot_warn_on});
+          } else if (id(hot_warn_active) && hot < ${tec_hot_warn_off}) {
+            id(hot_warn_active) = false;
+          }
+      # Enforce: latched fault kills TEC drive every tick until reset.
+      - if:
+          condition:
+            lambda: 'return id(tec_fault_latched);'
+          then:
+            - output.turn_off: nsleep_a
+            - output.turn_off: nsleep_b
+            - output.set_level: { id: pwm_a, level: 0 }
+            - output.set_level: { id: pwm_b, level: 0 }
+            - number.set: { id: tec_pl_number, value: 0.0 }
+      # Force hot fan to 100% during CUTOFF or FAULT (low latency, independent
+      # of hot_fan_speed's 10s cadence; hot_fan_speed also honors these flags).
+      - if:
+          condition:
+            lambda: 'return id(hot_cutoff_active) || id(tec_fault_latched);'
+          then:
+            - output.set_level: { id: fan_hot, level: 1.0 }

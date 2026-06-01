@@ -427,28 +427,6 @@ number:
             target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
 
   - platform: template
-    name: "Heatsink Heating Range"
-    id: cold_hs_up_range
-    optimistic: true
-    restore_value: true
-    initial_value: 1.5
-    min_value: 0.0
-    max_value: 10.0
-    step: 0.1
-    icon: mdi:arrow-up-bold
-
-  - platform: template
-    name: "Heatsink Cooling Range"
-    id: cold_hs_dn_range
-    optimistic: true
-    restore_value: true
-    initial_value: -10.0
-    min_value: -15.0
-    max_value: 0.0
-    step: 0.5
-    icon: mdi:arrow-down-bold
-
-  - platform: template
     name: "Heatsink Cooling Alpha"
     id: cold_hs_dn_alpha
     optimistic: true
@@ -469,17 +447,6 @@ number:
     step: 0.01
 
   - platform: template
-    name: "Heatsink Deadband"
-    id: cold_hs_deadband
-    optimistic: true
-    restore_value: true
-    initial_value: 0.1
-    min_value: 0
-    max_value: 10.0
-    step: 0.01
-    icon: mdi:arrow-down-bold
-
-  - platform: template
     name: "Wetting Force"
     id: warming_force
     optimistic: true
@@ -491,16 +458,6 @@ number:
     icon: mdi:arrow-down-bold
 
   - platform: template
-    name: "Heatsink Bias"
-    id: bias_range
-    optimistic: true
-    restore_value: true
-    initial_value: 2.0
-    min_value: -10.0
-    max_value: 10.0
-    step: 0.5
-
-  - platform: template
     name: "Frost Limit"
     id: frost_limit
     optimistic: true
@@ -509,6 +466,20 @@ number:
     min_value: 0.0
     max_value: 10.0
     step: 0.5
+
+  # Drying aggressiveness: how far below the frost limit the cold coil may be
+  # driven, per °C the chamber dewpoint sits above target (see cooling_force).
+  # 0 = pure frost-anchored (coil never commanded below the frost limit).
+  - platform: template
+    name: "Drying Gain"
+    id: drying_gain
+    optimistic: true
+    restore_value: true
+    initial_value: 1.0
+    min_value: 0.0
+    max_value: 5.0
+    step: 0.1
+    icon: mdi:water-minus
 
 # ══════════════════════════════════════════════════════════════════════════
 # PHASE SELECTOR - Choose operational mode
@@ -581,12 +552,18 @@ button:
     id: set_pwm
     on_press:
       then:
-        - output.set_level:
-            id: pwm_a
-            level: !lambda 'return id(tec_pl_number).state;'
-        - output.set_level:
-            id: pwm_b
-            level: !lambda 'return id(tec_pl_number).state;'
+        # Apply the requested TEC duty, but enforce the hot-side safety state:
+        # latched fault → 0; CUTOFF → clamp to the frozen ceiling (can fall,
+        # not rise). See tec_safety_check.
+        - lambda: |-
+            float level = id(tec_pl_number).state;
+            if (id(tec_fault_latched)) {
+              level = 0.0f;
+            } else if (id(hot_cutoff_active) && level > id(tec_cutoff_ceiling)) {
+              level = id(tec_cutoff_ceiling);
+            }
+            id(pwm_a)->set_level(level);
+            id(pwm_b)->set_level(level);
 
   # ──────────────────────────────────────────────────────────────────────────
   # USER BUTTON: Reset all phase timestamps and begin new cycle
@@ -611,6 +588,24 @@ button:
         - logger.log:
             format: "Cycle restarted at %u (timestamps and elapsed timers reset)"
             args: ['id(cycle_start_timestamp)']
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # USER BUTTON: Clear a latched hot-side TEC fault and re-init the drivers
+  # ──────────────────────────────────────────────────────────────────────────
+  - platform: template
+    name: "Reset TEC Fault"
+    id: reset_tec_fault
+    icon: "mdi:lock-reset"
+    on_press:
+      then:
+        - lambda: |-
+            id(tec_fault_latched) = false;
+            id(hot_nan_count)     = 0;
+            id(hot_cutoff_active) = false;
+            id(hot_warn_active)   = false;
+            id(tec_cutoff_ceiling) = 1.0f;
+        - logger.log: "TEC fault latch cleared - reinitializing drivers"
+        - script.execute: ti_driver_startup
 
   # ──────────────────────────────────────────────────────────────────────────
   # USER BUTTONS: Phase activation (REFACTORED to use centralized script)

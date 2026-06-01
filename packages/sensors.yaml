@@ -265,6 +265,9 @@ sensor:
     state_class: measurement
     update_interval: 10s
     lambda: |-
+      // Safety override: hot fan to 100% during CUTOFF or a latched fault.
+      if (id(hot_cutoff_active) || id(tec_fault_latched)) return 100.0;
+
       float hot = id(hot_temp).state;
       float min = 20.0, max = 23.9;
 
@@ -319,26 +322,44 @@ sensor:
 
     on_value:
       then:
-        - number.set:
-            id: cold_hs_setpoint
-            value: !lambda 'return id(cold_calc).state;'
+        - if:
+            condition:
+              lambda: 'return !id(is_defrosting);'
+            then:
+              - number.set:
+                  id: cold_hs_setpoint
+                  value: !lambda 'return id(cold_calc).state;'
 
   - platform: template
     name: "Drying Force"
     id: cooling_force
-    update_interval: 60s
+    update_interval: 10s
     lambda: |-
-      float dew_targ = id(dewpoint_celcius).state;
-      float dp_error = id(dewpoint_error).state;
-      float frst_lim = id(frost_limit).state;
+      float dew_targ = id(dewpoint_celcius).state;   // dewpoint setpoint, °C
+      float frst_lim = id(frost_limit).state;        // coil floor anchor, °C
+      float dp_error = id(dewpoint_error).state;      // target − actual; <0 = too wet
+      float gain     = id(drying_gain).state;        // °C below frost limit per °C wet
 
-      if (isnan(dp_error)) return 3.0;
-      if (dp_error <= -1) return (dew_targ - frst_lim) / 2;
-      if (dp_error >= -2) return dew_targ - frst_lim;
-      return 1.0;
+      // Frost-anchored base: at full PID cool demand (cld_actn≈1) cold_calc drives
+      // the coil from the dewpoint target down to exactly the frost limit. Guard so
+      // a dewpoint target below the frost limit can't invert the term.
+      float base = dew_targ - frst_lim;
+      if (base < 0.0f) base = 0.0f;
+
+      // Sensor loss: fall back to the safe base (no aggressive boost while blind).
+      if (isnan(dp_error)) return base;
+
+      // Wetness = how far the actual dewpoint sits ABOVE target (only when too wet),
+      // bounded so the intentional below-frost dive can't run away.
+      float wetness = (dp_error < 0.0f) ? -dp_error : 0.0f;
+      if (wetness > 5.0f) wetness = 5.0f;
+
+      // Drying force rises with wetness: each 1 °C too-wet lets the coil reach
+      // `gain` °C BELOW the frost limit at full demand (defrost handles the ice).
+      return base + gain * wetness;
     filters:
       - exponential_moving_average:
-          alpha: 0.01
+          alpha: 0.1
           send_every: 1
       - round: 1
 
@@ -630,6 +651,26 @@ binary_sensor:
     filters:
       - delayed_on: 3600s
       - delayed_off: 60s
+
+  # Hot-side TEC safety status (driven by tec_safety_check globals)
+  - platform: template
+    name: "TEC Hot-Side Fault (latched)"
+    id: tec_fault_bsensor
+    device_class: problem
+    entity_category: diagnostic
+    lambda: 'return id(tec_fault_latched);'
+
+  - platform: template
+    name: "TEC Hot-Side Cutoff"
+    device_class: problem
+    entity_category: diagnostic
+    lambda: 'return id(hot_cutoff_active);'
+
+  - platform: template
+    name: "TEC Hot-Side Warning"
+    device_class: problem
+    entity_category: diagnostic
+    lambda: 'return id(hot_warn_active);'
 
 text_sensor:
   - platform: template

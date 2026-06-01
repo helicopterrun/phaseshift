@@ -36,6 +36,18 @@ substitutions:
   # Match with TEC modules used in system
   default_max_current: "3.5"
 
+  # HOT-SIDE TEC SAFETY THRESHOLDS (°C, measured at the hot heatsink sensor).
+  # NOTE: this is the heatsink, not the TEC ceramic junction — the junction
+  # runs hotter, so these are conservative as junction limits. Tiered guard
+  # (see tec_safety_check): WARN (log/flag only) → CUTOFF (force hot fan high +
+  # freeze TEC power) → FAULT (disable TEC drive, latch until manual reset).
+  # WARN/CUTOFF clear with 5 °C hysteresis; FAULT and 3× sensor-loss latch.
+  tec_hot_warn_on:    "65"
+  tec_hot_warn_off:   "60"
+  tec_hot_cutoff_on:  "75"
+  tec_hot_cutoff_off: "70"
+  tec_hot_fault:      "80"
+
   # PHASE DURATIONS (Default Recipe)
   # Ramp: Linear transition from start conditions to end conditions
   # Plateau: Stable intermediate conditions before final hold
@@ -141,6 +153,10 @@ wifi:
     static_ip: $network_static_ip
     gateway: $network_gateway
     subnet: $network_subnet
+    # DNS required: the SNTP time platform resolves pool.ntp.org by hostname,
+    # and the whole phase engine is gated on on_time_sync (AdGuard resolvers).
+    dns1: 192.168.50.139
+    dns2: 192.168.50.111
 
 # LOGGING CONFIGURATION
 logger:
@@ -162,6 +178,8 @@ logger:
 
 # HOME ASSISTANT INTEGRATION
 api:
+  # Control is fully local; never reboot mid-cycle just because HA disconnected.
+  reboot_timeout: 0s
   encryption:
     key: !secret ss2_api
 ota:
@@ -219,3 +237,37 @@ globals:
     type: uint32_t
     restore_value: yes
     initial_value: '0'
+
+  # Defrost guard: true while defrost_cycle is running, so the cold-heatsink
+  # algorithm doesn't write cold_hs_setpoint and force pid_cold back to COOL,
+  # which would otherwise defeat the defrost within one 10s cold_calc tick.
+  - id: is_defrosting
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  # Hot-side TEC safety state (see tec_safety_check / tec_hot_* thresholds).
+  # Latched fault persists across reboots — only "Reset TEC Fault" clears it.
+  - id: tec_fault_latched
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+  # WARN/CUTOFF are non-latched (hysteresis); not persisted across reboot.
+  - id: hot_warn_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: hot_cutoff_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  # Consecutive NaN hot-side reads; latches a fault at 3 (sensor loss).
+  - id: hot_nan_count
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
+  # TEC PWM ceiling captured when CUTOFF trips, so power can fall but not rise.
+  - id: tec_cutoff_ceiling
+    type: float
+    restore_value: no
+    initial_value: '1.0'

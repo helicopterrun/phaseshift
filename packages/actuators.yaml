@@ -135,10 +135,3 @@ switch:
     on_turn_off:
       - logger.log: "Switched to Celsius"
       - button.press: submit_values
-
-  # Allow coil to drop below freezing toggle
-  - platform: template
-    id: allow_below_freezing
-    name: "Allow Coil Below Freezing"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF

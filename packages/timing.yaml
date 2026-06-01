@@ -18,6 +18,11 @@ interval:
     then:
       - script.execute: update_circulation_fan
 
+  # Hot-side TEC over-temperature / sensor-loss safety guard
+  - interval: 2s
+    then:
+      - script.execute: tec_safety_check
+
 #  - interval: 60s
 #    then:
 #      - script.execute: update_mode_from_elapsed

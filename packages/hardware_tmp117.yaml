@@ -36,4 +36,4 @@ sensor:
     state_class: measurement
     filters:
       - round: 1
-    update_interval: 10s
+    update_interval: 2s  # fast so the hot-side safety guard reacts promptly
