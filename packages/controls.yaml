@@ -1,9 +1,11 @@
 # controls.yaml
+# PhaseShift Environmental Control - User Interface Controls
+# Refactored: 2025.10.06 - Fixed runtime/substitution conflicts, centralized mode logic
 
 number:
-  #—————————————————————————————————————
-  # Primary target setpoints
-  #—————————————————————————————————————
+  # ══════════════════════════════════════════════════════════════════════════
+  # PRIMARY SETPOINTS - Active targets for temperature and humidity control
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Drybulb Target"
     id: drybulb_setpoint
@@ -28,9 +30,9 @@ number:
     max_value: 100
     step: 0.1
 
-  #—————————————————————————————————————
-  # Hardware driver numbers (internal)
-  #—————————————————————————————————————
+  # ══════════════════════════════════════════════════════════════════════════
+  # HARDWARE DRIVER CONTROLS - TEC current limiting and PWM level
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Max TEC Current"
     id: pwm_max_current_number
@@ -51,9 +53,9 @@ number:
     max_value: 1.0
     step: 0.01
 
-  #—————————————————————————————————————
-  # Duration controls for each phase
-  #—————————————————————————————————————
+  # ══════════════════════════════════════════════════════════════════════════
+  # PHASE DURATION CONTROLS - Time spent in each operational phase
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Ramp Duration"
     id: ramp_duration
@@ -66,24 +68,7 @@ number:
     step: 1
     on_value:
       then:
-        - component.update:
-            id: ramp_duration_s
-        - script.execute: update_dynamic_setpoints
-
-  - platform: template
-    name: "Plateau Duration"
-    id: plateau_duration
-    icon: mdi:calendar-clock
-    optimistic: true
-    restore_value: true
-    initial_value: ${plateau_duration}
-    min_value: 0
-    max_value: 256
-    step: 1
-    on_value:
-      then:
-        - component.update:
-            id: plateau_duration_s
+        - component.update: ramp_duration_s
         - script.execute: update_dynamic_setpoints
 
   - platform: template
@@ -98,8 +83,22 @@ number:
     step: 1
     on_value:
       then:
-        - component.update:
-            id: ramp_duration_s
+        - component.update: ramp_duration_s
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Plateau Duration"
+    id: plateau_duration
+    icon: mdi:calendar-clock
+    optimistic: true
+    restore_value: true
+    initial_value: ${plateau_duration}
+    min_value: 0
+    max_value: 256
+    step: 1
+    on_value:
+      then:
+        - component.update: plateau_duration_s
         - script.execute: update_dynamic_setpoints
 
   - platform: template
@@ -114,43 +113,12 @@ number:
     step: 1
     on_value:
       then:
-        - component.update:
-            id: plateau_duration_s
+        - component.update: plateau_duration_s
         - script.execute: update_dynamic_setpoints
 
-  #—————————————————————————————————————
-  # Ramp-stage dynamic setpoint overrides
-  #—————————————————————————————————————
-  - platform: template
-    name: "Ramp Start Dewpoint"
-    id: ramp_start_dewpoint
-    unit_of_measurement: "${temp_unit}"
-    optimistic: true
-    restore_value: true
-    initial_value: ${ramp_start_dewpoint}
-    min_value: 0.0
-    max_value: 100
-    step: 0.1
-    icon: mdi:weather-fog
-    on_value:
-      then:
-        - script.execute: update_dynamic_setpoints
-
-  - platform: template
-    name: "Ramp End Dewpoint"
-    id: ramp_end_dewpoint
-    unit_of_measurement: "${temp_unit}"
-    optimistic: true
-    restore_value: true
-    initial_value: ${ramp_end_dewpoint}
-    min_value: 0.0
-    max_value: 100
-    step: 0.1
-    icon: mdi:weather-fog
-    on_value:
-      then:
-        - script.execute: update_dynamic_setpoints
-
+  # ══════════════════════════════════════════════════════════════════════════
+  # RAMP PHASE - Dynamic setpoints (interpolated based on elapsed time)
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Ramp Start Temperature"
     id: ramp_start_temp
@@ -177,6 +145,36 @@ number:
     max_value: 100
     step: 0.1
     icon: mdi:thermometer
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp Start Dewpoint"
+    id: ramp_start_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_start_dewpoint}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
+    on_value:
+      then:
+        - script.execute: update_dynamic_setpoints
+
+  - platform: template
+    name: "Ramp End Dewpoint"
+    id: ramp_end_dewpoint
+    unit_of_measurement: "${temp_unit}"
+    optimistic: true
+    restore_value: true
+    initial_value: ${ramp_end_dewpoint}
+    min_value: 0.0
+    max_value: 100
+    step: 0.1
+    icon: mdi:weather-fog
     on_value:
       then:
         - script.execute: update_dynamic_setpoints
@@ -241,9 +239,9 @@ number:
       then:
         - script.execute: update_dynamic_setpoints
 
-  #—————————————————————————————————————
-  # Plateau static setpoints
-  #—————————————————————————————————————
+  # ══════════════════════════════════════════════════════════════════════════
+  # PLATEAU PHASE - Static intermediate conditions
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Plateau Temperature"
     id: plateau_temp
@@ -324,9 +322,9 @@ number:
               - script.execute: publish_mode_setpoints
               - script.execute: update_circulation_fan
 
-  #—————————————————————————————————————
-  # Hold static setpoints
-  #—————————————————————————————————————
+  # ══════════════════════════════════════════════════════════════════════════
+  # HOLD PHASE - Long-term stable storage conditions
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Hold Temperature"
     id: hold_temp
@@ -407,15 +405,15 @@ number:
               - script.execute: publish_mode_setpoints
               - script.execute: update_circulation_fan
 
-  #───────────────────────────────────────────
-  # Cold Heatsink Setpoint (for defrost & PID override)
-  #───────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
+  # ADVANCED CONTROLS - Cold heatsink tuning parameters
+  # ══════════════════════════════════════════════════════════════════════════
   - platform: template
     name: "Cold Heatsink Setpoint"
     id: cold_hs_setpoint
     unit_of_measurement: "°C"
     optimistic: true
-    restore_value: True
+    restore_value: true
     initial_value: 11.11
     min_value: -15.0
     max_value: 100.0
@@ -428,9 +426,6 @@ number:
             mode: COOL
             target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
 
-  #—————————————————————————————————————
-  # Cold‐side heatsink ranges
-  #—————————————————————————————————————
   - platform: template
     name: "Heatsink Heating Range"
     id: cold_hs_up_range
@@ -495,11 +490,8 @@ number:
     step: 0.1
     icon: mdi:arrow-down-bold
 
-  #—————————————————————————————————————
-  # Bias Temperature # Authority of drybulb on cold side temp when near dewpoint target. (default: 2°C)
-  #—————————————————————————————————————
   - platform: template
-    name: Heatsink Bias
+    name: "Heatsink Bias"
     id: bias_range
     optimistic: true
     restore_value: true
@@ -508,11 +500,8 @@ number:
     max_value: 10.0
     step: 0.5
 
-  #—————————————————————————————————————
-  # Frost limit is the lowest temperature the system will target to prevent frost (default: 2.0°C)
-  #—————————————————————————————————————
   - platform: template
-    name: Frost Limit
+    name: "Frost Limit"
     id: frost_limit
     optimistic: true
     restore_value: true
@@ -521,9 +510,9 @@ number:
     max_value: 10.0
     step: 0.5
 
-#—————————————————————————————————————
-# Phase selector
-#—————————————————————————————————————
+# ══════════════════════════════════════════════════════════════════════════
+# PHASE SELECTOR - Choose operational mode
+# ══════════════════════════════════════════════════════════════════════════
 select:
   - platform: template
     name: "Mode"
@@ -532,32 +521,34 @@ select:
     optimistic: true
     restore_value: true
 
-#—————————————————————————————————————
-# Buttons for setpoint & driver control
-#—————————————————————————————————————
+# ══════════════════════════════════════════════════════════════════════════
+# CONTROL BUTTONS - System commands and setpoint activation
+# ══════════════════════════════════════════════════════════════════════════
 button:
-  # Push all setpoints (Drybulb & Dewpoint) into the PID controllers
+  # ──────────────────────────────────────────────────────────────────────────
+  # INTERNAL: Apply setpoints to PID controllers
+  # FIXED: Now uses runtime switch state instead of substitution
+  # ──────────────────────────────────────────────────────────────────────────
   - platform: template
-    internal: True
+    internal: true
     id: submit_values
     on_press:
       then:
-        - sensor.template.publish:
-            id: drybulb_celcius
-            state: !lambda |-
-              float v = id(drybulb_setpoint).state;
-              if (${use_fahrenheit}) {
-                v = (v - 32.0) * 5.0 / 9.0;
-              }
-              return v;
-        - sensor.template.publish:
-            id: dewpoint_celcius
-            state: !lambda |-
-              float v = id(dewpoint_setpoint).state;
-              if (${use_fahrenheit}) {
-                v = (v - 32.0) * 5.0 / 9.0;
-              }
-              return v;
+        - lambda: |-
+            // Convert drybulb to Celsius based on RUNTIME switch state
+            float drybulb_value = id(drybulb_setpoint).state;
+            if (id(use_fahrenheit).state) {  // Runtime check, not substitution
+              drybulb_value = (drybulb_value - 32.0) * 5.0 / 9.0;
+            }
+            id(drybulb_celcius).publish_state(drybulb_value);
+            
+            // Convert dewpoint to Celsius based on RUNTIME switch state
+            float dewpoint_value = id(dewpoint_setpoint).state;
+            if (id(use_fahrenheit).state) {  // Runtime check, not substitution
+              dewpoint_value = (dewpoint_value - 32.0) * 5.0 / 9.0;
+            }
+            id(dewpoint_celcius).publish_state(dewpoint_value);
+            
         - climate.control:
             id: pid_drybulb
             mode: HEAT_COOL
@@ -567,9 +558,11 @@ button:
             mode: COOL
             target_temperature: !lambda 'return id(dewpoint_celcius).state;'
 
-  # Apply the maximum current limit to the TEC drivers
+  # ──────────────────────────────────────────────────────────────────────────
+  # INTERNAL: Apply TEC current limits to DAC outputs
+  # ──────────────────────────────────────────────────────────────────────────
   - platform: template
-    internal: True
+    internal: true
     id: apply_current_settings
     on_press:
       then:
@@ -580,9 +573,11 @@ button:
             id: vref_b_out
             level: !lambda 'return id(pwm_max_current_number).state * 0.7467 / 5.0;'
 
-  # Push the driver PWM level out to the TEC channels
+  # ──────────────────────────────────────────────────────────────────────────
+  # INTERNAL: Push PWM duty cycle to TEC driver channels
+  # ──────────────────────────────────────────────────────────────────────────
   - platform: template
-    internal: True
+    internal: true
     id: set_pwm
     on_press:
       then:
@@ -593,68 +588,42 @@ button:
             id: pwm_b
             level: !lambda 'return id(tec_pl_number).state;'
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # USER BUTTON: Reset all phase timestamps and begin new cycle
+  # ──────────────────────────────────────────────────────────────────────────
   - platform: template
     name: "Start New Cycle"
     id: restart_cycle
     icon: "mdi:restart"
     on_press:
       then:
-        # 1) Recompute all your dynamic setpoints immediately
         - script.execute: update_dynamic_setpoints
-
-        # 2) Stamp every phase start & reset elapsed counters
         - lambda: |-
             time_t now = id(sntp_time).now().timestamp;
-
             id(cycle_start_timestamp)   = now;
             id(ramp_start_timestamp)    = now;
             id(plateau_start_timestamp) = now;
             id(hold_start_timestamp)    = now;
-
             id(ramp_elapsed)     = 0;
             id(plateau_elapsed)  = 0;
             id(hold_elapsed)     = 0;
-
-        # 3) Force-update your elapsed sensors so HA shows 0 immediately
         - script.execute: update_elapsed_times
-
-        # 4) Log for debug
         - logger.log:
             format: "Cycle restarted at %u (timestamps and elapsed timers reset)"
-            args: [ 'id(cycle_start_timestamp)' ]
+            args: ['id(cycle_start_timestamp)']
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # USER BUTTONS: Phase activation (REFACTORED to use centralized script)
+  # ──────────────────────────────────────────────────────────────────────────
   - platform: template
     name: "Activate Ramp Mode"
     id: switch_to_ramp
     icon: "mdi:trending-up"
     on_press:
       then:
-        # 1) Change the mode
-        - select.set:
-            id: mode
-            option: "Ramp"
-
-        # 2) Run your old set_action lambda to stamp timestamps
-        - lambda: |-
-            const uint32_t now  = id(sntp_time).now().timestamp;
-            const auto   prev = id(last_mode);
-            const auto   m    = id(mode).state;
-
-            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
-              id(cycle_start_timestamp) = now;
-            }
-
-            if (m != prev) {
-              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
-              else if (m == "Plateau") id(plateau_start_timestamp) = now;
-              else                      id(hold_start_timestamp)   = now;
-            }
-
-            id(last_mode) = m;
-
-        # 3) Publish new setpoints & refresh fan
-        - script.execute: publish_mode_setpoints
-        - script.execute: update_circulation_fan
+        - script.execute:
+            id: set_mode_with_timestamp
+            mode: "Ramp"
 
   - platform: template
     name: "Activate Plateau Mode"
@@ -662,27 +631,9 @@ button:
     icon: "mdi:trending-right"
     on_press:
       then:
-        - select.set:
-            id: mode
-            option: "Plateau"
-        - lambda: |-
-            const uint32_t now  = id(sntp_time).now().timestamp;
-            const auto   prev = id(last_mode);
-            const auto   m    = id(mode).state;
-
-            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
-              id(cycle_start_timestamp) = now;
-            }
-
-            if (m != prev) {
-              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
-              else if (m == "Plateau") id(plateau_start_timestamp) = now;
-              else                      id(hold_start_timestamp)   = now;
-            }
-
-            id(last_mode) = m;
-        - script.execute: publish_mode_setpoints
-        - script.execute: update_circulation_fan
+        - script.execute:
+            id: set_mode_with_timestamp
+            mode: "Plateau"
 
   - platform: template
     name: "Activate Hold Mode"
@@ -690,24 +641,6 @@ button:
     icon: "mdi:timer-sand"
     on_press:
       then:
-        - select.set:
-            id: mode
-            option: "Hold"
-        - lambda: |-
-            const uint32_t now  = id(sntp_time).now().timestamp;
-            const auto   prev = id(last_mode);
-            const auto   m    = id(mode).state;
-
-            if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
-              id(cycle_start_timestamp) = now;
-            }
-
-            if (m != prev) {
-              if      (m == "Ramp")    id(ramp_start_timestamp)   = now;
-              else if (m == "Plateau") id(plateau_start_timestamp) = now;
-              else                      id(hold_start_timestamp)   = now;
-            }
-
-            id(last_mode) = m;
-        - script.execute: publish_mode_setpoints
-        - script.execute: update_circulation_fan
+        - script.execute:
+            id: set_mode_with_timestamp
+            mode: "Hold"

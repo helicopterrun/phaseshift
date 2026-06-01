@@ -2,9 +2,9 @@
 
 script:
 
-  #──────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
   # Publish the correct setpoints for the current phase
-  #──────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
   - id: publish_mode_setpoints
     then:
       - lambda: |-
@@ -24,40 +24,38 @@ script:
           id(dewpoint_setpoint).publish_state(dp);
       - button.press: submit_values
 
-  # ──────────────────────────────────────────────────────────────────────────────
-  # update_mode_from_elapsed: auto-advance phases by “pressing” your buttons
-  # ──────────────────────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
+  # Auto-advance phases by "pressing" mode switch buttons
+  # ══════════════════════════════════════════════════════════════════════════
   - id: update_mode_from_elapsed
     then:
-      # 1) If we’re in Ramp and have hit the ramp duration → switch to Plateau
       - if:
           condition:
             and:
               - lambda: 'return id(mode).state == "Ramp";'
-              # compare elapsed seconds to your ramp_duration (in seconds)
               - lambda: 'return id(ramp_elapsed) >= id(ramp_duration_s).state;'
           then:
-            - button.press:
-                id: switch_to_plateau
+            - button.press: switch_to_plateau
 
-      # 2) If we’re in Plateau and have hit the plateau duration → switch to Hold
       - if:
           condition:
             and:
               - lambda: 'return id(mode).state == "Plateau";'
-              # compare elapsed seconds to your plateau_duration (in seconds)
               - lambda: 'return id(plateau_elapsed) >= id(plateau_duration_s).state;'
           then:
-            - button.press:
-                id: switch_to_hold
+            - button.press: switch_to_hold
 
-  # Update the circulation fan output
+  # ══════════════════════════════════════════════════════════════════════════
+  # Update circulation fan output
+  # ══════════════════════════════════════════════════════════════════════════
   - id: update_circulation_fan
     mode: restart
     then:
       - component.update: circ_fan_command
 
+  # ══════════════════════════════════════════════════════════════════════════
   # TEC driver initialization on boot
+  # ══════════════════════════════════════════════════════════════════════════
   - id: ti_driver_startup
     then:
       - output.turn_off: nsleep_a
@@ -81,7 +79,9 @@ script:
           value: 0.0
       - button.press: set_pwm
 
+  # ══════════════════════════════════════════════════════════════════════════
   # Restore last phase and units on boot
+  # ══════════════════════════════════════════════════════════════════════════
   - id: return_to_default
     then:
       - script.execute: restore_mode
@@ -93,12 +93,16 @@ script:
           id: mode
           option: !lambda 'return id(last_mode);'
 
+  # ══════════════════════════════════════════════════════════════════════════
   # Push current setpoints to controllers
+  # ══════════════════════════════════════════════════════════════════════════
   - id: activate_setpoints
     then:
       - button.press: submit_values
 
+  # ══════════════════════════════════════════════════════════════════════════
   # Temporary defrost cycle when icing detected
+  # ══════════════════════════════════════════════════════════════════════════
   - id: defrost_cycle
     then:
       - logger.log: "Defrost cycle started"
@@ -113,35 +117,32 @@ script:
           mode: COOL
           target_temperature: !lambda 'return id(cold_hs_setpoint).state;'
 
+  # ══════════════════════════════════════════════════════════════════════════
   # Update all elapsed-time sensors
+  # ══════════════════════════════════════════════════════════════════════════
   - id: update_elapsed_times
     then:
       - component.update: total_time_formatted
-
       - if:
           condition:
             lambda: 'return id(mode).state == "Ramp";'
           then:
             - component.update: ramp_time_elapsed
-
       - if:
           condition:
             lambda: 'return id(mode).state == "Plateau";'
           then:
             - component.update: plateau_time_elapsed
-
       - if:
           condition:
             lambda: 'return id(mode).state == "Hold";'
           then:
             - component.update: hold_time_elapsed
-
       - script.execute: update_dynamic_setpoints
 
-  #──────────────────────────────────────────────────────────────
-  # Update all dynamic ramp/plateau/hold setpoints, circulation fan,
-  # and republish current mode setpoints
-  #──────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
+  # Update dynamic setpoints and republish current mode setpoints
+  # ══════════════════════════════════════════════════════════════════════════
   - id: update_dynamic_setpoints
     then:
       - component.update: ramp_temp_setpoint_dynamic
@@ -154,3 +155,39 @@ script:
           then:
             - script.execute: publish_mode_setpoints
             - script.execute: activate_setpoints
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NEW: Centralized mode switching with timestamp management
+  # ══════════════════════════════════════════════════════════════════════════
+  - id: set_mode_with_timestamp
+    parameters:
+      mode: string
+    then:
+      - lambda: |-
+          uint32_t now = id(sntp_time).now().timestamp;
+          std::string prev = id(last_mode);
+          std::string m = mode;  // Use the parameter directly!
+          
+          if (m == "Ramp" && id(cycle_start_timestamp) == 0) {
+            id(cycle_start_timestamp) = now;
+          }
+          
+          if (m != prev) {
+            if (m == "Ramp") {
+              id(ramp_start_timestamp) = now;
+              ESP_LOGI("mode", "Switched to RAMP at %u", now);
+            } else if (m == "Plateau") {
+              id(plateau_start_timestamp) = now;
+              ESP_LOGI("mode", "Switched to PLATEAU at %u", now);
+            } else {
+              id(hold_start_timestamp) = now;
+              ESP_LOGI("mode", "Switched to HOLD at %u", now);
+            }
+          }
+          
+          id(last_mode) = m;
+      - select.set:
+          id: mode
+          option: !lambda 'return mode;'
+      - script.execute: publish_mode_setpoints
+      - script.execute: update_circulation_fan

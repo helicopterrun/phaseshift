@@ -29,7 +29,6 @@ substitutions:
 
   # TEMPERATURE UNITS
   # Note: Internal calculations always use Celsius. This controls display units.
-  use_fahrenheit: "true"
   temp_unit: "°F"
 
   # TEC DRIVER LIMITS
@@ -136,6 +135,7 @@ esp32:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  min_auth_mode: WPA2
   power_save_mode: none
   manual_ip:
     static_ip: $network_static_ip

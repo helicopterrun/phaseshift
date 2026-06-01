@@ -130,8 +130,10 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     on_turn_on:
+      - logger.log: "Switched to Fahrenheit"
       - button.press: submit_values
     on_turn_off:
+      - logger.log: "Switched to Celsius"
       - button.press: submit_values
 
   # Allow coil to drop below freezing toggle
